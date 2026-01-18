@@ -4,6 +4,7 @@ namespace Ruudk\Absurd\Execution;
 
 use DateTimeImmutable;
 use PDO;
+use ReflectionClass;
 use Ruudk\Absurd\Exception\SuspendTask;
 use Ruudk\Absurd\Exception\TaskExecutionError;
 use Ruudk\Absurd\Exception\TimeoutError;
@@ -71,7 +72,12 @@ final readonly class Runner
     {
         $checkpoint = $this->checkpoints->checkAndAdvance($stepName);
 
-        $actualWakeAt = $checkpoint->exists ? new DateTimeImmutable((string) $checkpoint->value) : $wakeAt;
+        if ($checkpoint->exists) {
+            $parsed = DateTimeImmutable::createFromFormat(DateTimeImmutable::ATOM, (string) $checkpoint->value);
+            $actualWakeAt = $parsed !== false ? $parsed : new DateTimeImmutable((string) $checkpoint->value);
+        } else {
+            $actualWakeAt = $wakeAt;
+        }
 
         if (!$checkpoint->exists) {
             $this->checkpoints->persist($checkpoint->name, $wakeAt->format(DateTimeImmutable::ATOM));
@@ -188,7 +194,7 @@ final readonly class Runner
             'queue' => $this->context->queueName,
             'run_id' => $this->task->runId,
             'error' => $this->context->serializer->encode([
-                'name' => $error::class,
+                'name' => new ReflectionClass($error)->getShortName(),
                 'message' => $error->getMessage(),
                 'stack' => $error->getTraceAsString(),
             ]),
@@ -201,7 +207,7 @@ final readonly class Runner
         $this->executeQuery('SELECT absurd.schedule_run(:queue, :run_id, :wake_at)', [
             'queue' => $this->context->queueName,
             'run_id' => $this->task->runId,
-            'wake_at' => $wakeAt->format('Y-m-d H:i:s'),
+            'wake_at' => $wakeAt->format(DateTimeImmutable::ATOM),
         ]);
     }
 

@@ -58,9 +58,13 @@ final readonly class Executor
 
             $wrapper = null;
             if ($this->eventDispatcher !== null) {
-                $event = new TaskExecutionEvent($ctx);
-                $this->eventDispatcher->dispatch($event);
-                $wrapper = $event->getWrapper();
+                try {
+                    $event = new TaskExecutionEvent($ctx);
+                    $this->eventDispatcher->dispatch($event);
+                    $wrapper = $event->getWrapper();
+                } catch (Throwable $e) {
+                    $this->logger->warning('Event dispatch failed: {message}', ['message' => $e->getMessage()]);
+                }
             }
 
             /** @var mixed $result Task handlers return dynamic types */

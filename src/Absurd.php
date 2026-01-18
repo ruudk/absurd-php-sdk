@@ -114,9 +114,15 @@ final class Absurd
      *
      * Running tasks will stop at their next checkpoint, heartbeat, or await event.
      * This operation is idempotent - cancelling an already cancelled task has no effect.
+     *
+     * @throws TaskExecutionError If taskId is empty
      */
     public function cancelTask(string $taskId, ?string $queueName = null): void
     {
+        if ($taskId === '') {
+            throw new TaskExecutionError('taskId must be a non-empty string');
+        }
+
         $this->executeQuery('SELECT absurd.cancel_task(:queue, :task_id)', [
             'queue' => $queueName ?? $this->queueName,
             'task_id' => $taskId,
@@ -180,6 +186,81 @@ final class Absurd
         $context = new ExecutionContext($this->pdo, $this->queueName, $claimTimeout, $this->serializer);
         $executor = new Executor($context, $this->registry, $logger, $this->eventDispatcher);
         $executor->execute($task, $claimTimeout, $fatalOnLeaseTimeout);
+    }
+
+    /**
+     * Process a batch of tasks synchronously (one-shot processing).
+     *
+     * Claims and executes tasks immediately, then returns. Useful for testing
+     * or when you want to process tasks without running a long-lived worker.
+     *
+     * @return int Number of tasks processed
+     */
+    public function workBatch(WorkerOptions $options = new WorkerOptions()): int
+    {
+        $tasks = $this->claimTasks(new ClaimOptions(
+            workerId: $options->workerId,
+            claimTimeout: $options->claimTimeout,
+            batchSize: $options->batchSize,
+        ));
+
+        foreach ($tasks as $task) {
+            $this->executeTask($task, $options->claimTimeout, $options->fatalOnLeaseTimeout, $options->logger);
+        }
+
+        return count($tasks);
+    }
+
+    /**
+     * Clean up old completed or failed tasks.
+     *
+     * Removes tasks that have been completed or failed for longer than the specified TTL.
+     *
+     * @param int $ttlSeconds Tasks older than this are eligible for cleanup
+     * @param int $limit Maximum number of tasks to clean up in one call
+     * @return int Number of tasks cleaned up
+     */
+    public function cleanupTasks(int $ttlSeconds, int $limit = 1000): int
+    {
+        $stmt = $this->pdo->prepare('SELECT absurd.cleanup_tasks(:queue, :ttl_seconds, :limit)');
+        if ($stmt === false) {
+            return 0;
+        }
+        $stmt->execute([
+            'queue' => $this->queueName,
+            'ttl_seconds' => $ttlSeconds,
+            'limit' => $limit,
+        ]);
+
+        /** @var int|string|false $result */
+        $result = $stmt->fetchColumn();
+        return is_numeric($result) ? (int) $result : 0;
+    }
+
+    /**
+     * Clean up old consumed events.
+     *
+     * Removes events that have been consumed for longer than the specified TTL.
+     *
+     * @param int $ttlSeconds Events older than this are eligible for cleanup
+     * @param int $limit Maximum number of events to clean up in one call
+     * @return int Number of events cleaned up
+     */
+    public function cleanupEvents(int $ttlSeconds, int $limit = 1000): int
+    {
+        $stmt = $this->pdo->prepare('SELECT absurd.cleanup_events(:queue, :ttl_seconds, :limit)');
+        if ($stmt === false) {
+            return 0;
+        }
+        $stmt->execute([
+            'queue' => $this->queueName,
+            'ttl_seconds' => $ttlSeconds,
+            'limit' => $limit,
+        ]);
+
+        /** @var int|string|false $result */
+        $result = $stmt->fetchColumn();
+        return is_numeric($result) ? (int) $result : 0;
     }
 
     /**

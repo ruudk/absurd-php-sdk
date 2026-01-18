@@ -120,7 +120,7 @@ final class CheckpointStore
             return $count === 1 ? $name : sprintf('%s#%d', $name, $count);
         }
 
-        $count = $this->stepNameCounter[$name] ?? 1;
+        $count = $this->stepNameCounter[$name] ?? 0;
         return $count === 1 ? $name : sprintf('%s#%d', $name, $count);
     }
 }

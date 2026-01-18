@@ -279,6 +279,30 @@ pcntl_signal(SIGINT, fn() => $worker->stop());
 $worker->start();
 ```
 
+### Worker Concurrency Model
+
+PHP workers process tasks **sequentially** within a single process. The `batchSize` option controls how many tasks are claimed from the database in each poll, but they are still executed one at a time. This design ensures:
+
+- Predictable resource usage per worker
+- Simple error isolation (one task failure doesn't affect others)
+- No need for complex thread-safety considerations
+
+For concurrent task processing, run multiple worker processes:
+
+```bash
+# Run 4 worker processes in parallel
+for i in {1..4}; do php worker.php & done
+```
+
+Or use a process manager like Supervisor:
+
+```ini
+[program:absurd-worker]
+command=php /path/to/worker.php
+numprocs=4
+process_name=%(program_name)s_%(process_num)02d
+```
+
 ## Error Handling with Events
 
 Use the PSR-14 EventDispatcher for error handling and lifecycle hooks:

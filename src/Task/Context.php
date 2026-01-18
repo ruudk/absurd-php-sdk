@@ -15,6 +15,11 @@ use Ruudk\Absurd\Execution\Command\SleepUntil;
 
 /**
  * Context passed to task handlers with helper methods for workflow control.
+ *
+ * IMPORTANT: All methods in this class MUST be called from within a Fiber context
+ * (i.e., during task execution). Calling these methods outside a Fiber will result
+ * in a FiberError. The SDK automatically creates the Fiber context when executing
+ * registered task handlers.
  */
 final class Context
 {
