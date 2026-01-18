@@ -1,0 +1,11 @@
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      run: ./vendor/bin/mago fmt --check
+    lint:
+      run: ./vendor/bin/mago lint --minimum-fail-level=warning
+    analyze:
+      run: ./vendor/bin/mago analyze --minimum-fail-level=warning
+    test:
+      run: ./vendor/bin/phpunit

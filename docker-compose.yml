@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: absurd-postgres
+    environment:
+      POSTGRES_DB: absurd
+      POSTGRES_USER: absurd
+      POSTGRES_PASSWORD: absurd
+    ports:
+      - "54329:5432"
+    volumes:
+      - absurd_php_sdk_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U absurd"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  habitat:
+    build:
+      context: .
+      dockerfile: habitat.Dockerfile
+    container_name: absurd-habitat
+    environment:
+      HABITAT_DB_HOST: postgres
+      HABITAT_DB_PORT: 5432
+      HABITAT_DB_NAME: absurd
+      HABITAT_DB_USER: absurd
+      HABITAT_DB_PASSWORD: absurd
+      HABITAT_DB_SSLMODE: disable
+    ports:
+      - "7890:7890"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  absurd_php_sdk_postgres:

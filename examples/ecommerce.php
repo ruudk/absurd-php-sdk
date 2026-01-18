@@ -1,0 +1,84 @@
+#!/usr/bin/env php
+<?php declare(strict_types=1);
+
+/**
+ * E-commerce Order Fulfillment Example
+ *
+ * Comprehensive demonstration of ALL Absurd SDK features:
+ * - Typed payloads (OrderPayload)
+ * - Checkpoints (step) for validation, payment, shipping label
+ * - Event waiting (awaitEvent) with timeout for payment webhook
+ * - Event emitting (emitEvent) for order-shipped, order-complete
+ * - Sleep (sleepFor) for notification delay
+ * - Sleep (sleepUntil) for scheduled delivery
+ * - Sub-task spawning for inventory, fraud check, notifications
+ * - Heartbeat during shipping label generation
+ * - Retry strategies (exponential, fixed, none)
+ * - Cancellation policies (max 2 hour processing)
+ * - Idempotency keys (payment, notifications)
+ * - SpawnResult.created logging
+ * - cancelTask() for order cancellation
+ * - listQueues() for queue discovery
+ * - Headers/tracing propagation
+ * - TaskErrorEvent listener for error handling
+ *
+ * Usage:
+ *   php examples/ecommerce.php consume   - Start the consumer worker
+ *   php examples/ecommerce.php produce   - Create an order and simulate events (interactive)
+ */
+
+require __DIR__ . '/../vendor/autoload.php';
+
+use Monolog\Formatter\LineFormatter;
+use Monolog\Handler\StreamHandler;
+use Monolog\Logger;
+use Monolog\Processor\PsrLogMessageProcessor;
+use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\Examples\ColorizedTaskProcessor;
+use Ruudk\Absurd\Examples\ConsumeCommand;
+use Ruudk\Absurd\Examples\ProduceCommand;
+use Ruudk\Absurd\Examples\TracingSubscriber;
+use Ruudk\Absurd\Serialization\SymfonySerializer;
+use Symfony\Component\Console\Application;
+use Symfony\Component\Dotenv\Dotenv;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Serializer\Normalizer\ArrayDenormalizer;
+use Symfony\Component\Serializer\Normalizer\BackedEnumNormalizer;
+use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
+use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
+use Symfony\Component\Serializer\Serializer;
+
+new Dotenv()->bootEnv(dirname(__DIR__) . '/.env');
+
+$pdo = new PDO($_ENV['ABSURD_DATABASE_URL']);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+$formatter = new LineFormatter("[%datetime%] %message%\n", 'H:i:s');
+$handler = new StreamHandler('php://stdout');
+$handler->setFormatter($formatter);
+$logger = new Logger('ecommerce');
+$logger->pushHandler($handler);
+$logger->pushProcessor(new PsrLogMessageProcessor());
+$logger->pushProcessor(new ColorizedTaskProcessor());
+
+$serializer = new SymfonySerializer(new Serializer(normalizers: [
+    new BackedEnumNormalizer(),
+    new DateTimeNormalizer(),
+    new ArrayDenormalizer(),
+    new ObjectNormalizer(),
+], encoders: [new JsonEncoder()]));
+
+// Set up event dispatcher with tracing subscriber for trace propagation
+$eventDispatcher = new EventDispatcher();
+$tracingSubscriber = new TracingSubscriber();
+$eventDispatcher->addSubscriber($tracingSubscriber);
+
+$absurd = new Absurd($pdo, $serializer, 'orders', eventDispatcher: $eventDispatcher);
+
+$app = new Application('E-commerce Order Fulfillment', '1.0.0');
+$app->addCommands([
+    new ConsumeCommand($absurd, $logger, $eventDispatcher),
+    new ProduceCommand($absurd, $tracingSubscriber),
+]);
+$app->run();

@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo, pdo_pgsql, pcntl
+          coverage: none
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+
+      - name: Run mago fmt --check
+        run: vendor/bin/mago fmt --check
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo, pdo_pgsql, pcntl
+          coverage: none
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+
+      - name: Run mago lint
+        run: vendor/bin/mago lint
+
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo, pdo_pgsql, pcntl
+          coverage: none
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+
+      - name: Run mago analyze
+        run: vendor/bin/mago analyze
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: absurd
+          POSTGRES_USER: absurd
+          POSTGRES_PASSWORD: absurd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U absurd"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo, pdo_pgsql, pcntl
+          coverage: none
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+
+      - name: Download absurdctl
+        run: gh release download 0.0.7 --repo earendil-works/absurd --pattern absurdctl
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Initialize Absurd
+        run: |
+          chmod +x absurdctl
+          ./absurdctl init
+        env:
+          PGDATABASE: postgres://absurd:absurd@localhost:5432/absurd
+
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit
+        env:
+          ABSURD_DATABASE_URL: pgsql:host=localhost;port=5432;dbname=absurd;user=absurd;password=absurd
