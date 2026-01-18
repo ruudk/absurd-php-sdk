@@ -23,6 +23,7 @@ use Ruudk\Absurd\Task\Registration;
 use Ruudk\Absurd\Task\Spawner;
 use Ruudk\Absurd\Task\SpawnOptions;
 use Ruudk\Absurd\Task\SpawnResult;
+use Ruudk\Absurd\Task\TaskInfo;
 use Ruudk\Absurd\Worker\Worker;
 use Ruudk\Absurd\Worker\WorkerOptions;
 
@@ -261,6 +262,55 @@ final class Absurd
         /** @var int|string|false $result */
         $result = $stmt->fetchColumn();
         return is_numeric($result) ? (int) $result : 0;
+    }
+
+    /**
+     * Get task information by ID.
+     *
+     * @return TaskInfo|null The task info, or null if the task doesn't exist
+     */
+    public function getTask(string $taskId, ?string $queueName = null): ?TaskInfo
+    {
+        if ($taskId === '') {
+            throw new TaskExecutionError('taskId must be a non-empty string');
+        }
+
+        $queue = $queueName ?? $this->queueName;
+        $tableName = 't_' . $queue;
+
+        // Using prepared statement with quoted table name for safety
+        // Note: table name is derived from queue name which is controlled internally
+        $stmt = $this->pdo->prepare("SELECT task_id, task_name, state, attempts, completed_payload
+             FROM absurd.\"{$tableName}\"
+             WHERE task_id = :task_id");
+        if ($stmt === false) {
+            throw new TaskExecutionError('Failed to prepare query for getTask');
+        }
+
+        $stmt->execute(['task_id' => $taskId]);
+
+        /** @var array{task_id: string, task_name: string, state: string, attempts: int, completed_payload: string|null}|false $row */
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if ($row === false) {
+            return null;
+        }
+
+        /** @var mixed $completedPayload */
+        $completedPayload = $row['completed_payload'] !== null
+            ? $this->serializer->decode($row['completed_payload'])
+            : null;
+
+        /** @var 'pending'|'running'|'sleeping'|'completed'|'failed'|'cancelled' $state */
+        $state = $row['state'];
+
+        return new TaskInfo(
+            taskId: $row['task_id'],
+            taskName: $row['task_name'],
+            state: $state,
+            attempts: (int) $row['attempts'],
+            completedPayload: $completedPayload,
+        );
     }
 
     /**

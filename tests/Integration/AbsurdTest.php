@@ -113,4 +113,65 @@ final class AbsurdTest extends IntegrationTestCase
 
         static::assertTrue($executed);
     }
+
+    #[Test]
+    public function getTaskReturnsNullForNonExistentTask(): void
+    {
+        // Use a valid UUID format that doesn't exist
+        $taskInfo = $this->absurd->getTask('00000000-0000-0000-0000-000000000000');
+
+        static::assertNull($taskInfo);
+    }
+
+    #[Test]
+    public function getTaskWithEmptyIdThrows(): void
+    {
+        $this->expectException(TaskExecutionError::class);
+        $this->expectExceptionMessage('taskId must be a non-empty string');
+
+        $this->absurd->getTask('');
+    }
+
+    #[Test]
+    public function getTaskReturnsPendingTask(): void
+    {
+        $this->absurd->registerTask('info-task', static fn(array $p, TaskContext $ctx) => $p);
+        $result = $this->absurd->spawn('info-task', ['test' => 'data']);
+
+        $taskInfo = $this->absurd->getTask($result->taskId);
+
+        static::assertNotNull($taskInfo);
+        static::assertSame($result->taskId, $taskInfo->taskId);
+        static::assertSame('info-task', $taskInfo->taskName);
+        static::assertSame('pending', $taskInfo->state);
+        static::assertSame(1, $taskInfo->attempts);
+        static::assertFalse($taskInfo->isCompleted());
+        static::assertFalse($taskInfo->isTerminal());
+    }
+
+    #[Test]
+    public function getTaskReturnsCompletedTaskWithPayload(): void
+    {
+        $this->absurd->registerTask('complete-task', static fn(array $p, TaskContext $ctx) => ['result' => 'done']);
+        $result = $this->absurd->spawn('complete-task', ['input' => 'value']);
+
+        $this->processAllTasks();
+
+        $taskInfo = $this->absurd->getTask($result->taskId);
+
+        static::assertNotNull($taskInfo);
+        static::assertSame('completed', $taskInfo->state);
+        static::assertTrue($taskInfo->isCompleted());
+        static::assertTrue($taskInfo->isTerminal());
+        static::assertSame(['result' => 'done'], $taskInfo->completedPayload);
+    }
+
+    #[Test]
+    public function cancelTaskWithEmptyIdThrows(): void
+    {
+        $this->expectException(TaskExecutionError::class);
+        $this->expectExceptionMessage('taskId must be a non-empty string');
+
+        $this->absurd->cancelTask('');
+    }
 }

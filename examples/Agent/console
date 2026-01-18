@@ -1,0 +1,81 @@
+#!/usr/bin/env php
+<?php declare(strict_types=1);
+
+/**
+ * AI Agent Example
+ *
+ * Demonstrates a durable AI agent workflow based on the pattern from:
+ * https://lucumr.pocoo.org/2025/11/3/absurd-workflows/
+ *
+ * Features:
+ * - Loop-based agent that checkpoints each iteration
+ * - OpenAI integration with tool calling (get_weather, search_web, calculate)
+ * - Automatic recovery from crashes - resumes from last checkpoint
+ * - Durable conversation state stored in PostgreSQL
+ *
+ * Requirements:
+ * - OPENAI_KEY environment variable (for consume command only)
+ * - ABSURD_DATABASE_URL environment variable
+ *
+ * Usage:
+ *   php examples/agent/console consume   - Start the worker (requires OPENAI_KEY)
+ *   php examples/agent/console ask       - Interactive chat (spawns tasks through Absurd)
+ */
+
+require __DIR__ . '/../../vendor/autoload.php';
+
+use Monolog\Formatter\LineFormatter;
+use Monolog\Handler\StreamHandler;
+use Monolog\Logger;
+use Monolog\Processor\PsrLogMessageProcessor;
+use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\Examples\Agent\AskCommand;
+use Ruudk\Absurd\Examples\Agent\ConsumeCommand;
+use Ruudk\Absurd\Examples\ColorizedTaskProcessor;
+use Ruudk\Absurd\Serialization\SymfonySerializer;
+use Symfony\Component\Console\Application;
+use Symfony\Component\Dotenv\Dotenv;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Serializer\Normalizer\ArrayDenormalizer;
+use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
+use Symfony\Component\Serializer\Serializer;
+
+// Load environment variables (.env, .env.local)
+new Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
+
+// Validate database URL
+$databaseUrl = $_ENV['ABSURD_DATABASE_URL'] ?? (getenv('ABSURD_DATABASE_URL') !== false ? getenv('ABSURD_DATABASE_URL') : null);
+if ($databaseUrl === null || $databaseUrl === '') {
+    fwrite(STDERR, "Error: ABSURD_DATABASE_URL environment variable is required\n");
+    exit(1);
+}
+
+// Set up database connection
+$pdo = new PDO($databaseUrl);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+// Set up logging
+$formatter = new LineFormatter("[%datetime%] %message%\n", 'H:i:s');
+$handler = new StreamHandler('php://stdout', Logger::DEBUG);
+$handler->setFormatter($formatter);
+$logger = new Logger('agent');
+$logger->pushHandler($handler);
+$logger->pushProcessor(new PsrLogMessageProcessor());
+$logger->pushProcessor(new ColorizedTaskProcessor());
+
+// Set up serializer
+$serializer = new SymfonySerializer(new Serializer(normalizers: [
+    new ArrayDenormalizer(),
+    new ObjectNormalizer(),
+], encoders: [new JsonEncoder()]));
+
+// Create Absurd client
+$absurd = new Absurd($pdo, $serializer, 'agents');
+
+// Create and run the console application
+$app = new Application('AI Agent', '1.0.0');
+$app->addCommands([
+    new ConsumeCommand($absurd, $logger),
+    new AskCommand($absurd),
+]);
+$app->run();

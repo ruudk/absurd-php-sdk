@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Ruudk\Absurd\Examples;
+namespace Ruudk\Absurd\Examples\Ecommerce;
 
 use DateTimeImmutable;
 

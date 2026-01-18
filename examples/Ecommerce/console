@@ -23,11 +23,11 @@
  * - TaskErrorEvent listener for error handling
  *
  * Usage:
- *   php examples/ecommerce.php consume   - Start the consumer worker
- *   php examples/ecommerce.php produce   - Create an order and simulate events (interactive)
+ *   php examples/ecommerce/ecommerce.php consume   - Start the consumer worker
+ *   php examples/ecommerce/ecommerce.php produce   - Create an order and simulate events (interactive)
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/../../vendor/autoload.php';
 
 use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\StreamHandler;
@@ -35,9 +35,9 @@ use Monolog\Logger;
 use Monolog\Processor\PsrLogMessageProcessor;
 use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Examples\ColorizedTaskProcessor;
-use Ruudk\Absurd\Examples\ConsumeCommand;
-use Ruudk\Absurd\Examples\ProduceCommand;
-use Ruudk\Absurd\Examples\TracingSubscriber;
+use Ruudk\Absurd\Examples\Ecommerce\ConsumeCommand;
+use Ruudk\Absurd\Examples\Ecommerce\ProduceCommand;
+use Ruudk\Absurd\Examples\Ecommerce\TracingSubscriber;
 use Ruudk\Absurd\Serialization\SymfonySerializer;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Dotenv\Dotenv;
@@ -49,7 +49,7 @@ use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
 use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
 use Symfony\Component\Serializer\Serializer;
 
-new Dotenv()->bootEnv(dirname(__DIR__) . '/.env');
+new Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 $pdo = new PDO($_ENV['ABSURD_DATABASE_URL']);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

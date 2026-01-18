@@ -256,6 +256,45 @@ $absurd->cancelTask($taskId, 'orders');
 
 Running tasks will stop at their next checkpoint, heartbeat, or await event call.
 
+## Retrieving Task Info
+
+```php
+use Ruudk\Absurd\Task\TaskInfo;
+
+// Get task state and result
+$taskInfo = $absurd->getTask($taskId);
+
+if ($taskInfo === null) {
+    echo "Task not found\n";
+}
+
+// Check task state
+echo "State: {$taskInfo->state}\n";  // pending, running, sleeping, completed, failed, cancelled
+echo "Attempts: {$taskInfo->attempts}\n";
+
+// Check terminal states
+if ($taskInfo->isCompleted()) {
+    $result = $taskInfo->completedPayload;
+    echo "Result: " . json_encode($result) . "\n";
+}
+
+if ($taskInfo->isFailed()) {
+    echo "Task failed after {$taskInfo->attempts} attempts\n";
+}
+
+if ($taskInfo->isCancelled()) {
+    echo "Task was cancelled\n";
+}
+
+// Check if task reached any terminal state
+if ($taskInfo->isTerminal()) {
+    echo "Task is done (completed, failed, or cancelled)\n";
+}
+
+// Get from a specific queue
+$taskInfo = $absurd->getTask($taskId, 'orders');
+```
+
 ## Worker Configuration
 
 ```php
@@ -442,19 +481,42 @@ After running `make up`:
 - **PostgreSQL** is available at `localhost:54329`
 - **Habitat UI** (task dashboard) is available at http://localhost:7890
 
-### Running the Example
+### Running the Examples
 
-The SDK includes a comprehensive e-commerce order fulfillment example demonstrating checkpoints, events, sub-tasks, and trace propagation.
+The SDK includes two comprehensive examples:
+
+#### E-commerce Order Fulfillment
+
+Demonstrates checkpoints, events, sub-tasks, and trace propagation in a realistic order processing scenario.
 
 ```bash
 # Terminal 1: Start the worker
-php examples/ecommerce.php consume
+php examples/Ecommerce/console consume
 
 # Terminal 2: Create an order and interact with the workflow
-php examples/ecommerce.php produce
+php examples/Ecommerce/console produce
 ```
 
-The example will guide you through confirming payment, showing how tasks checkpoint their progress, spawn sub-tasks for inventory and fraud checks, and emit events.
+#### AI Agent with Tool Calling
+
+Demonstrates a durable AI agent workflow based on [this blog post](https://lucumr.pocoo.org/2025/11/3/absurd-workflows/). The agent loops through conversation steps, calling tools as needed, with each iteration durably checkpointed.
+
+```bash
+# Set your OpenAI API key
+export OPENAI_KEY=your-api-key
+
+# Terminal 1: Start the worker
+php examples/Agent/console consume
+
+# Terminal 2: Ask questions
+php examples/Agent/console ask
+```
+
+Features:
+- Loop-based agent with automatic checkpointing per iteration
+- OpenAI integration with tool calling (get_weather, search_web, calculate)
+- Automatic recovery from crashes - resumes from last checkpoint
+- Durable conversation state stored in PostgreSQL
 
 ### Make Commands
 
@@ -484,6 +546,7 @@ absurdctl create-queue -d your-database-name default
 |--------|-------------|
 | `registerTask(name, handler, options?)` | Register a task handler |
 | `spawn(taskName, params, options?, queue?)` | Spawn a new task |
+| `getTask(taskId, queueName?)` | Get task info by ID |
 | `emitEvent(eventName, payload?, queueName?)` | Emit an event |
 | `cancelTask(taskId, queueName?)` | Cancel a running task |
 | `claimTasks(options?)` | Claim tasks for processing |

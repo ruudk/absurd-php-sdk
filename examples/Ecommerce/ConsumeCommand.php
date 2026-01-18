@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Ruudk\Absurd\Examples;
+namespace Ruudk\Absurd\Examples\Ecommerce;
 
 use Psr\Log\LoggerInterface;
 use Ruudk\Absurd\Absurd;
@@ -54,14 +54,8 @@ final class ConsumeCommand extends Command
         $this->absurd->registerTask('fraud-check', new FraudCheckTask($this->absurd, $this->logger));
         $this->absurd->registerTask('send-notification', new SendNotificationTask($this->logger));
 
-        $this->logger->info('Order Fulfillment Worker started');
-        $output->writeln('<info>Registered tasks:</info>');
-        $output->writeln('  - order-fulfillment (main orchestrator)');
-        $output->writeln('  - check-inventory (warehouse inventory check)');
-        $output->writeln('  - fraud-check (fraud detection with retries)');
-        $output->writeln('  - send-notification (email + SMS notifications)');
-        $output->writeln('');
-        $output->writeln('Press Ctrl+C to stop');
+        $this->logger->info('Order Fulfillment Worker started (Press Ctrl+C to stop)');
+        $this->logger->info('Registered: order-fulfillment, check-inventory, fraud-check, send-notification');
 
         $worker = $this->absurd->startWorker(new WorkerOptions(
             workerId: 'order-fulfillment-worker',
@@ -71,14 +65,13 @@ final class ConsumeCommand extends Command
         // Set up graceful shutdown handlers
         pcntl_async_signals(true);
         pcntl_signal(SIGINT, function () use ($worker): void {
-            $this->logger->warning('Shutting down...');
+            $this->logger->info('Shutting down...');
             $worker->stop();
         });
         pcntl_signal(SIGTERM, $worker->stop(...));
 
         $worker->start();
 
-        $this->logger->info('Worker stopped gracefully');
         return Command::SUCCESS;
     }
 }

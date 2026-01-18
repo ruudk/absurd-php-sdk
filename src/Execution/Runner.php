@@ -72,11 +72,10 @@ final readonly class Runner
     {
         $checkpoint = $this->checkpoints->checkAndAdvance($stepName);
 
+        $actualWakeAt = $wakeAt;
         if ($checkpoint->exists) {
             $parsed = DateTimeImmutable::createFromFormat(DateTimeImmutable::ATOM, (string) $checkpoint->value);
             $actualWakeAt = $parsed !== false ? $parsed : new DateTimeImmutable((string) $checkpoint->value);
-        } else {
-            $actualWakeAt = $wakeAt;
         }
 
         if (!$checkpoint->exists) {

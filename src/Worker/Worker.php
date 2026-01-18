@@ -34,6 +34,8 @@ final class Worker
         $this->running = true;
         $lastPoll = 0.0;
 
+        $this->options->logger->info('Worker started', ['workerId' => $this->options->workerId]);
+
         while ($this->running) {
             try {
                 // Respect poll interval
@@ -57,7 +59,15 @@ final class Worker
                     continue;
                 }
 
+                $this->options->logger->info('Claimed {count} task(s)', ['count' => count($tasks)]);
+
                 foreach ($tasks as $task) {
+                    $this->options->logger->info('Executing task {taskName}', [
+                        'taskId' => $task->taskId,
+                        'taskName' => $task->taskName,
+                        'attempt' => $task->attempt,
+                    ]);
+
                     try {
                         $this->absurd->executeTask(
                             $task,
@@ -65,7 +75,14 @@ final class Worker
                             $this->options->fatalOnLeaseTimeout,
                             $this->options->logger,
                         );
+
+                        $this->options->logger->info('Task completed', ['taskId' => $task->taskId]);
                     } catch (Throwable $exception) {
+                        $this->options->logger->error('Task failed: {message}', [
+                            'taskId' => $task->taskId,
+                            'message' => $exception->getMessage(),
+                        ]);
+
                         // Rethrow connection errors, handle other task errors
                         if ($this->isConnectionError($exception)) {
                             throw $exception;
@@ -83,6 +100,8 @@ final class Worker
                 $this->wait($this->options->pollInterval);
             }
         }
+
+        $this->options->logger->info('Worker stopped');
     }
 
     /**
