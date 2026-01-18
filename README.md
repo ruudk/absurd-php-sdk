@@ -10,6 +10,12 @@ Absurd is the simplest durable execution workflow system you can think of. It's 
 
 Durable execution (or durable workflows) is a way to run long-lived, reliable functions that can survive crashes, restarts, and network failures without losing state or duplicating work. Instead of running your logic in memory, a durable execution system decomposes a task into smaller pieces (step functions) and records every step and decision.
 
+## How It Works
+
+This SDK uses [PHP Fibers](https://www.php.net/manual/en/language.fibers.php) to provide a clean, synchronous-looking API for durable workflows. When you call methods like `$ctx->step()`, `$ctx->awaitEvent()`, or `$ctx->sleepFor()`, the Fiber suspends execution, allowing the SDK to checkpoint progress to the database. When the task resumes (after a crash, timeout, or event), execution continues from exactly where it left off.
+
+This means you can write workflow code that looks like normal sequential PHP code, while the SDK handles all the complexity of persistence, retries, and resumption behind the scenes.
+
 ## Requirements
 
 - PHP 8.4+
