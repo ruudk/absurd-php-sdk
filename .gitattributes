@@ -1,0 +1,7 @@
+* text=auto eol=lf
+
+* export-ignore
+/src export-ignore=false
+/src/** export-ignore=false
+/LICENSE export-ignore=false
+/composer.json export-ignore=false
