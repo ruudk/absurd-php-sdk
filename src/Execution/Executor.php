@@ -52,7 +52,7 @@ final readonly class Executor
         try {
             /** @var mixed $params Task parameters are dynamically typed based on handler signature */
             $params = $this->context->serializer->decode($task->rawParams, $registration->payloadType);
-            $ctx = new TaskContext($task->taskId, $task->runId, $task->attempt, $task->headers ?? []);
+            $ctx = new TaskContext($task->taskId, $task->runId, $task->attempt, $task->headers ?? [], $this->logger);
 
             $execute = static fn(): mixed => $fiberExecutor->execute($registration->handler, $params, $ctx);
 

@@ -29,6 +29,11 @@ final readonly class FiberExecutor
      */
     public function execute(Closure $handler, mixed $params, TaskContext $ctx): mixed
     {
+        // If checkpoints exist, we're resuming a previous run - start in replay mode
+        if ($this->runner->hasCheckpoints()) {
+            $ctx->markReplaying();
+        }
+
         $fiber = new Fiber($handler);
 
         /** @var Command|null $command Fiber yields Command objects or null when terminated */
@@ -43,6 +48,15 @@ final readonly class FiberExecutor
 
             /** @var mixed $result Command execution returns dynamic types */
             $result = $command->execute($this->runner);
+
+            // Handle checkpoint results to track replay state
+            if ($result instanceof StepResult) {
+                if (!$result->wasReplayed) {
+                    $ctx->markNotReplaying();
+                }
+                /** @var mixed $result Extract the actual value from the step result */
+                $result = $result->value;
+            }
 
             /** @var Command|null $command */
             $command = $fiber->resume($result);

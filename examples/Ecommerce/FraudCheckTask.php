@@ -2,7 +2,6 @@
 
 namespace Ruudk\Absurd\Examples\Ecommerce;
 
-use Psr\Log\LoggerInterface;
 use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Task\Context as TaskContext;
 
@@ -13,12 +12,12 @@ use Ruudk\Absurd\Task\Context as TaskContext;
  * - Simulated failure (20% chance) to show retry behavior
  * - Event emission when complete
  * - Headers/tracing propagation
+ * - Replay-aware logging via $ctx->logger
  */
 final readonly class FraudCheckTask
 {
     public function __construct(
         private Absurd $absurd,
-        private LoggerInterface $logger,
     ) {}
 
     /**
@@ -29,8 +28,8 @@ final readonly class FraudCheckTask
     {
         $traceId = $ctx->headers['trace_id'] ?? 'none';
 
-        $this->logger->info('Starting fraud check for order {orderId}', [
-            'taskId' => $ctx->taskId,
+        // taskId and runId are auto-injected by ReplayAwareLogger
+        $ctx->logger->info('Starting fraud check for order {orderId}', [
             'traceId' => $traceId,
             'orderId' => $payload['orderId'],
             'customerId' => $payload['customerId'],
@@ -40,8 +39,7 @@ final readonly class FraudCheckTask
 
         // Simulate 20% failure rate to demonstrate retries
         if (random_int(1, 100) <= 20) {
-            $this->logger->warning('Fraud check service temporarily unavailable', [
-                'taskId' => $ctx->taskId,
+            $ctx->logger->warning('Fraud check service temporarily unavailable', [
                 'traceId' => $traceId,
                 'orderId' => $payload['orderId'],
                 'attempt' => $ctx->attempt,
@@ -76,8 +74,7 @@ final readonly class FraudCheckTask
             'flags' => $flags,
         ];
 
-        $this->logger->info('Fraud check complete: {status} (score: {score})', [
-            'taskId' => $ctx->taskId,
+        $ctx->logger->info('Fraud check complete: {status} (score: {score})', [
             'traceId' => $traceId,
             'orderId' => $payload['orderId'],
             'status' => $approved ? 'approved' : 'rejected',

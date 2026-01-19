@@ -2,7 +2,6 @@
 
 namespace Ruudk\Absurd\Examples\Ecommerce;
 
-use Psr\Log\LoggerInterface;
 use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Exception\TimeoutError;
 use Ruudk\Absurd\Execution\AwaitEventOptions;
@@ -25,12 +24,12 @@ use Ruudk\Absurd\Task\SpawnOptions;
  * - Idempotency keys for deduplication
  * - SpawnResult.created logging
  * - Headers/tracing propagation
+ * - Replay-aware logging via $ctx->logger (logs are skipped during checkpoint replay)
  */
 final readonly class OrderFulfillmentTask
 {
     public function __construct(
         private Absurd $absurd,
-        private LoggerInterface $logger,
     ) {}
 
     /**
@@ -292,9 +291,7 @@ final readonly class OrderFulfillmentTask
      */
     private function log(string $level, string $message, TaskContext $ctx, string $traceId, array $extra = []): void
     {
-        $this->logger->log($level, $message, array_merge([
-            'taskId' => $ctx->taskId,
-            'traceId' => $traceId,
-        ], $extra));
+        // taskId and runId are auto-injected by ReplayAwareLogger
+        $ctx->logger->log($level, $message, array_merge(['traceId' => $traceId], $extra));
     }
 }

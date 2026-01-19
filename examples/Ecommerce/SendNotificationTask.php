@@ -2,7 +2,6 @@
 
 namespace Ruudk\Absurd\Examples\Ecommerce;
 
-use Psr\Log\LoggerInterface;
 use Ruudk\Absurd\Task\Context as TaskContext;
 
 /**
@@ -13,13 +12,10 @@ use Ruudk\Absurd\Task\Context as TaskContext;
  * - RetryStrategy::fixed(10) for reliable delivery
  * - Multiple notification channels (email, SMS)
  * - Trace ID propagation from parent task
+ * - Replay-aware logging via $ctx->logger
  */
 final readonly class SendNotificationTask
 {
-    public function __construct(
-        private LoggerInterface $logger,
-    ) {}
-
     /**
      * @param array{orderId: string, email: string, type: 'shipped'|'delivered', trackingNumber: string, carrier: string} $params
      * @return array{sent: bool, channels: list<string>, messageIds: array{email?: string, sms?: string}}
@@ -28,8 +24,8 @@ final readonly class SendNotificationTask
     {
         $traceId = $ctx->headers['trace_id'] ?? 'none';
 
-        $this->logger->info('Sending {type} notification for order {orderId}', [
-            'taskId' => $ctx->taskId,
+        // taskId and runId are auto-injected by ReplayAwareLogger
+        $ctx->logger->info('Sending {type} notification for order {orderId}', [
             'traceId' => $traceId,
             'orderId' => $params['orderId'],
             'type' => $params['type'],
@@ -54,8 +50,7 @@ final readonly class SendNotificationTask
             $messageIds['sms'] = $smsMessageId;
         }
 
-        $this->logger->info('Notification sent for order {orderId} via {channels}', [
-            'taskId' => $ctx->taskId,
+        $ctx->logger->info('Notification sent for order {orderId} via {channels}', [
             'traceId' => $traceId,
             'orderId' => $params['orderId'],
             'channels' => implode(', ', $channels),
@@ -75,8 +70,7 @@ final readonly class SendNotificationTask
     private function sendEmail(array $params, TaskContext $ctx, string $traceId): ?string
     {
         // Simulate email sending
-        $this->logger->debug('Sending email to {email}', [
-            'taskId' => $ctx->taskId,
+        $ctx->logger->debug('Sending email to {email}', [
             'traceId' => $traceId,
             'email' => $params['email'],
         ]);
@@ -102,8 +96,7 @@ final readonly class SendNotificationTask
         // Simulate email API response
         $messageId = 'email_' . bin2hex(random_bytes(12));
 
-        $this->logger->debug('Email sent: {subject}', [
-            'taskId' => $ctx->taskId,
+        $ctx->logger->debug('Email sent: {subject}', [
             'traceId' => $traceId,
             'subject' => $subject,
             'messageId' => $messageId,
@@ -120,8 +113,7 @@ final readonly class SendNotificationTask
     {
         // Simulate phone number lookup - 70% of customers have SMS enabled
         if (random_int(1, 100) > 70) {
-            $this->logger->debug('Customer has no phone number on file, skipping SMS', [
-                'taskId' => $ctx->taskId,
+            $ctx->logger->debug('Customer has no phone number on file, skipping SMS', [
                 'traceId' => $traceId,
                 'orderId' => $params['orderId'],
             ]);
@@ -140,8 +132,7 @@ final readonly class SendNotificationTask
         // Simulate SMS API response
         $messageId = 'sms_' . bin2hex(random_bytes(8));
 
-        $this->logger->debug('SMS sent for order {orderId}', [
-            'taskId' => $ctx->taskId,
+        $ctx->logger->debug('SMS sent for order {orderId}', [
             'traceId' => $traceId,
             'orderId' => $params['orderId'],
             'messageId' => $messageId,

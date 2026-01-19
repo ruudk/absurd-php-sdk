@@ -36,20 +36,28 @@ final readonly class Runner
     }
 
     /**
+     * Check if the task has any existing checkpoints (i.e., is resuming).
+     */
+    public function hasCheckpoints(): bool
+    {
+        return $this->checkpoints->hasAny();
+    }
+
+    /**
      * Execute a named step with checkpointing.
      */
-    public function executeCheckpoint(string $name, mixed $value): mixed
+    public function executeCheckpoint(string $name, mixed $value): StepResult
     {
         $checkpoint = $this->checkpoints->checkAndAdvance($name);
 
         if ($checkpoint->exists) {
-            return $checkpoint->value;
+            return new StepResult($checkpoint->value, wasReplayed: true);
         }
 
         /** @var mixed $result Checkpoint values are dynamically typed */
         $result = is_callable($value) ? $value() : $value;
         $this->checkpoints->persist($checkpoint->name, $result);
-        return $result;
+        return new StepResult($result, wasReplayed: false);
     }
 
     /**

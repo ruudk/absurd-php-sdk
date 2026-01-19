@@ -2,7 +2,6 @@
 
 namespace Ruudk\Absurd\Examples\Agent;
 
-use Psr\Log\LoggerInterface;
 use Ruudk\Absurd\Task\Context as TaskContext;
 
 /**
@@ -15,6 +14,7 @@ use Ruudk\Absurd\Task\Context as TaskContext;
  * - OpenAI API integration with tool calls
  * - Each iteration is durably checkpointed
  * - Automatic recovery on crash/restart
+ * - Replay-aware logging via $ctx->logger (logs are skipped during checkpoint replay)
  */
 final readonly class AgentTask
 {
@@ -22,7 +22,6 @@ final readonly class AgentTask
 
     public function __construct(
         private OpenAIClient $openai,
-        private LoggerInterface $logger,
     ) {}
 
     /**
@@ -42,8 +41,8 @@ final readonly class AgentTask
             ? [['role' => 'system', 'content' => $systemPrompt], ...$history]
             : [['role' => 'system', 'content' => $systemPrompt], ['role' => 'user', 'content' => $params['prompt']]];
 
-        $this->logger->info('[IN] User message: {prompt}', [
-            'taskId' => $ctx->taskId,
+        // taskId and runId are auto-injected by ReplayAwareLogger
+        $ctx->logger->info('[IN] User message: {prompt}', [
             'prompt' => $params['prompt'],
         ]);
 
@@ -53,8 +52,7 @@ final readonly class AgentTask
         while ($iteration < self::MAX_ITERATIONS) {
             $iteration++;
 
-            $this->logger->info('Agent iteration {iteration}', [
-                'taskId' => $ctx->taskId,
+            $ctx->logger->info('Agent iteration {iteration}', [
                 'iteration' => $iteration,
                 'messageCount' => count($messages),
             ]);
@@ -72,16 +70,14 @@ final readonly class AgentTask
             foreach ($stepResult['messages'] as $msg) {
                 if (isset($msg['tool_calls'])) {
                     foreach ($msg['tool_calls'] as $tc) {
-                        $this->logger->info('[TOOL] Calling {tool}: {args}', [
-                            'taskId' => $ctx->taskId,
+                        $ctx->logger->info('[TOOL] Calling {tool}: {args}', [
                             'tool' => $tc['function']['name'],
                             'args' => $tc['function']['arguments'],
                         ]);
                     }
                 }
                 if (($msg['role'] ?? '') === 'tool') {
-                    $this->logger->info('[TOOL] Result: {result}', [
-                        'taskId' => $ctx->taskId,
+                    $ctx->logger->info('[TOOL] Result: {result}', [
                         'result' => $msg['content'] ?? '',
                     ]);
                 }
@@ -89,8 +85,7 @@ final readonly class AgentTask
 
             // Log assistant response if any
             if ($stepResult['response'] !== '') {
-                $this->logger->info('[OUT] Assistant response: {response}', [
-                    'taskId' => $ctx->taskId,
+                $ctx->logger->info('[OUT] Assistant response: {response}', [
                     'response' => $stepResult['response'],
                 ]);
             }
@@ -103,14 +98,12 @@ final readonly class AgentTask
         }
 
         if ($iteration >= self::MAX_ITERATIONS) {
-            $this->logger->warning('Agent reached max iterations', [
-                'taskId' => $ctx->taskId,
+            $ctx->logger->warning('Agent reached max iterations', [
                 'maxIterations' => self::MAX_ITERATIONS,
             ]);
         }
 
-        $this->logger->info('Agent completed in {iterations} iteration(s)', [
-            'taskId' => $ctx->taskId,
+        $ctx->logger->info('Agent completed in {iterations} iteration(s)', [
             'iterations' => $iteration,
         ]);
 

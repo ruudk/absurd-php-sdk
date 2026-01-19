@@ -54,6 +54,14 @@ final class CheckpointStore
     }
 
     /**
+     * Check if any checkpoints have been loaded.
+     */
+    public function hasAny(): bool
+    {
+        return $this->cache !== [];
+    }
+
+    /**
      * Check if a checkpoint exists.
      */
     public function has(string $name): bool

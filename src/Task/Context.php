@@ -4,6 +4,8 @@ namespace Ruudk\Absurd\Task;
 
 use DateTimeImmutable;
 use Fiber;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Ruudk\Absurd\Exception\TimeoutError;
 use Ruudk\Absurd\Execution\AwaitEventOptions;
 use Ruudk\Absurd\Execution\Command\AwaitEvent;
@@ -23,6 +25,13 @@ use Ruudk\Absurd\Execution\Command\SleepUntil;
  */
 final class Context
 {
+    private bool $replaying = false;
+
+    /**
+     * Replay-aware logger that only outputs when not replaying cached steps.
+     */
+    public readonly LoggerInterface $logger;
+
     /**
      * @param array<string, mixed> $headers
      */
@@ -31,7 +40,37 @@ final class Context
         public readonly string $runId,
         public readonly int $attempt,
         public readonly array $headers = [],
-    ) {}
+        ?LoggerInterface $logger = null,
+    ) {
+        $this->logger = new ReplayAwareLogger($logger ?? new NullLogger(), $this);
+    }
+
+    /**
+     * Check if the task is currently replaying cached checkpoints.
+     *
+     * Returns true until a step is executed that was not previously cached.
+     * Use this to conditionally skip side effects (like logging) during replay.
+     */
+    public function isReplaying(): bool
+    {
+        return $this->replaying;
+    }
+
+    /**
+     * @internal
+     */
+    public function markReplaying(): void
+    {
+        $this->replaying = true;
+    }
+
+    /**
+     * @internal
+     */
+    public function markNotReplaying(): void
+    {
+        $this->replaying = false;
+    }
 
     /**
      * Execute a named step with automatic checkpointing.

@@ -6,7 +6,10 @@ use Monolog\LogRecord;
 use Monolog\Processor\ProcessorInterface;
 
 /**
- * Monolog processor that colorizes log messages based on task ID.
+ * Monolog processor that colorizes log messages based on run ID.
+ *
+ * Each task execution run gets a unique color, so resumed tasks
+ * or retries will have different colors than the original run.
  */
 final class ColorizedTaskProcessor implements ProcessorInterface
 {
@@ -22,22 +25,27 @@ final class ColorizedTaskProcessor implements ProcessorInterface
     private int $colorIndex = 0;
 
     /** @var array<string, string> */
-    private array $taskColors = [];
+    private array $runColors = [];
 
     public function __invoke(LogRecord $record): LogRecord
     {
         $taskId = $record->context['taskId'] ?? null;
+        $runId = $record->context['runId'] ?? null;
 
         if ($taskId === null) {
             return $record;
         }
 
-        if (!isset($this->taskColors[$taskId])) {
-            $this->taskColors[$taskId] = self::COLORS[$this->colorIndex % count(self::COLORS)];
+        // Use runId for color assignment (each execution gets unique color)
+        // Fall back to taskId if runId not available
+        $colorKey = $runId ?? $taskId;
+
+        if (!isset($this->runColors[$colorKey])) {
+            $this->runColors[$colorKey] = self::COLORS[$this->colorIndex % count(self::COLORS)];
             $this->colorIndex++;
         }
 
-        $color = $this->taskColors[$taskId];
+        $color = $this->runColors[$colorKey];
         $message = sprintf('%s[%s]%s %s', $color, $taskId, self::RESET, $record->message);
 
         return $record->with(message: $message);
