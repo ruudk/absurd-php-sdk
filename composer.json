@@ -1,8 +1,36 @@
 {
     "name": "ruudk/absurd-php-sdk",
     "description": "PHP SDK for Absurd: a Durable Execution Engine for Postgres",
-    "type": "library",
     "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Ruud Kamphuis",
+            "email": "ruudk@users.noreply.github.com"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "ext-pdo": "*",
+        "psr/event-dispatcher": "^1.0",
+        "psr/log": "^3.0",
+        "symfony/event-dispatcher-contracts": "^3.6",
+        "symfony/serializer": "^7.4 || ^8.0"
+    },
+    "require-dev": {
+        "ext-bcmath": "*",
+        "ext-curl": "*",
+        "ext-pcntl": "*",
+        "carthage-software/mago": "1.1.0",
+        "ergebnis/composer-normalize": "^2.47",
+        "monolog/monolog": "^3.10",
+        "phpunit/phpunit": "^12.5",
+        "shipmonk/composer-dependency-analyser": "^1.8",
+        "symfony/console": "^7.4 || ^8.0",
+        "symfony/dotenv": "^8.0",
+        "symfony/event-dispatcher": "^8.0",
+        "symfony/property-access": "^8.0"
+    },
     "autoload": {
         "psr-4": {
             "Ruudk\\Absurd\\": "src/"
@@ -14,32 +42,13 @@
             "Ruudk\\Absurd\\Examples\\": "examples/"
         }
     },
-    "authors": [
-        {
-            "name": "Ruud Kamphuis",
-            "email": "ruudk@users.noreply.github.com"
-        }
-    ],
-    "require": {
-        "symfony/dotenv": "^7.4 || ^8.0",
-        "php": "^8.4",
-        "ext-pdo": "*",
-        "ext-pcntl": "*",
-        "psr/log": "^3.0",
-        "psr/container": "^2.0",
-        "symfony/serializer": "^7.4 || ^8.0",
-        "symfony/property-access": "^7.4 || ^8.0",
-        "symfony/event-dispatcher": "^7.4 || ^8.0"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^12.5",
-        "carthage-software/mago": "^1.1.0",
-        "symfony/console": "^7.4 || ^8.0",
-        "monolog/monolog": "^3.10"
-    },
     "config": {
         "allow-plugins": {
-            "carthage-software/mago": true
+            "carthage-software/mago": true,
+            "ergebnis/composer-normalize": true
         }
+    },
+    "scripts": {
+        "post-install-cmd": "lefthook install"
     }
 }

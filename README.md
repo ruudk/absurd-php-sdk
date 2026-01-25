@@ -16,12 +16,6 @@ This SDK uses [PHP Fibers](https://www.php.net/manual/en/language.fibers.php) to
 
 This means you can write workflow code that looks like normal sequential PHP code, while the SDK handles all the complexity of persistence, retries, and resumption behind the scenes.
 
-## Requirements
-
-- PHP 8.4+
-- PDO extension with PostgreSQL driver
-- PCNTL extension (for signal handling in workers)
-
 ## Installation
 
 ```bash

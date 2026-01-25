@@ -7,6 +7,32 @@ on:
     branches: [main]
 
 jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: pdo, pdo_pgsql, pcntl
+          coverage: none
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+
+      - name: Composer Validate
+        run: composer validate --strict
+
+      - name: Composer Normalize
+        run: composer normalize --diff --dry-run
+
+      - name: Composer Dependency Analyser
+        run: ./vendor/bin/composer-dependency-analyser
+
   fmt:
     name: Format
     runs-on: ubuntu-latest
@@ -68,8 +94,14 @@ jobs:
         run: vendor/bin/mago analyze
 
   test:
-    name: Tests
+    name: Tests (PHP ${{ matrix.php }} - ${{ matrix.dependencies }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.5']
+        dependencies: ['lowest', 'highest']
 
     services:
       postgres:
@@ -92,12 +124,14 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: ${{ matrix.php }}
           extensions: pdo, pdo_pgsql, pcntl
           coverage: none
 
       - name: Install dependencies
         uses: ramsey/composer-install@v3
+        with:
+          dependency-versions: ${{ matrix.dependencies }}
 
       - name: Download absurdctl
         run: gh release download 0.0.7 --repo earendil-works/absurd --pattern absurdctl

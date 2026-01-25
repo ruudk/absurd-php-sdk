@@ -1,11 +1,24 @@
 pre-commit:
   parallel: true
   commands:
+    composer-validate:
+      glob: "composer.{json,lock}"
+      run: composer validate --strict
+    composer-normalize:
+      glob: "composer.json"
+      run: composer normalize
+    composer-dependency-analyser:
+      glob: "{src/**/*.php,tests/**/*.php,examples/**/*.php,composer.json,composer.lock}"
+      run: ./vendor/bin/composer-dependency-analyser
     format:
+      glob: "*.php"
       run: ./vendor/bin/mago fmt --check
     lint:
+      glob: "*.php"
       run: ./vendor/bin/mago lint --minimum-fail-level=warning
     analyze:
+      glob: "*.php"
       run: ./vendor/bin/mago analyze --minimum-fail-level=warning
     test:
+      glob: "*.php"
       run: ./vendor/bin/phpunit
