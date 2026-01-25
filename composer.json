@@ -49,6 +49,6 @@
         }
     },
     "scripts": {
-        "post-install-cmd": "lefthook install"
+        "post-install-cmd": "command -v lefthook >/dev/null 2>&1 && lefthook install || true"
     }
 }
