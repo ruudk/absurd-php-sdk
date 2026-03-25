@@ -221,14 +221,14 @@ final class Absurd
      * @param int $limit Maximum number of tasks to clean up in one call
      * @return int Number of tasks cleaned up
      */
-    public function cleanupTasks(int $ttlSeconds, int $limit = 1000): int
+    public function cleanupTasks(int $ttlSeconds, int $limit = 1000, ?string $queue = null): int
     {
         $stmt = $this->pdo->prepare('SELECT absurd.cleanup_tasks(:queue, :ttl_seconds, :limit)');
         if ($stmt === false) {
             return 0;
         }
         $stmt->execute([
-            'queue' => $this->queueName,
+            'queue' => $queue ?? $this->queueName,
             'ttl_seconds' => $ttlSeconds,
             'limit' => $limit,
         ]);
@@ -247,14 +247,14 @@ final class Absurd
      * @param int $limit Maximum number of events to clean up in one call
      * @return int Number of events cleaned up
      */
-    public function cleanupEvents(int $ttlSeconds, int $limit = 1000): int
+    public function cleanupEvents(int $ttlSeconds, int $limit = 1000, ?string $queue = null): int
     {
         $stmt = $this->pdo->prepare('SELECT absurd.cleanup_events(:queue, :ttl_seconds, :limit)');
         if ($stmt === false) {
             return 0;
         }
         $stmt->execute([
-            'queue' => $this->queueName,
+            'queue' => $queue ?? $this->queueName,
             'ttl_seconds' => $ttlSeconds,
             'limit' => $limit,
         ]);
