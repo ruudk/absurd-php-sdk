@@ -6,6 +6,7 @@ use Closure;
 use Fiber;
 use Ruudk\Absurd\Exception\SuspendTask;
 use Ruudk\Absurd\Exception\TaskExecutionError;
+use Ruudk\Absurd\Exception\TimeoutError;
 use Ruudk\Absurd\Execution\Command\Command;
 use Ruudk\Absurd\Task\Context as TaskContext;
 use Ruudk\Absurd\Worker\LeaseMonitor;
@@ -47,7 +48,12 @@ final readonly class FiberExecutor
             }
 
             /** @var mixed $result Command execution returns dynamic types */
-            $result = $command->execute($this->runner);
+            try {
+                $result = $command->execute($this->runner);
+            } catch (TimeoutError $e) {
+                $command = $fiber->throw($e);
+                continue;
+            }
 
             // Handle checkpoint results to track replay state
             if ($result instanceof StepResult) {
