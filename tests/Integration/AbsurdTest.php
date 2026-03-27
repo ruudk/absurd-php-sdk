@@ -10,6 +10,7 @@ use Ruudk\Absurd\Task\Context as TaskContext;
 use Ruudk\Absurd\Task\RegisterOptions;
 use Ruudk\Absurd\Task\RetryStrategy;
 use Ruudk\Absurd\Task\SpawnOptions;
+
 use function PHPUnit\Framework\assertEquals;
 
 final class AbsurdTest extends IntegrationTestCase
@@ -205,6 +206,10 @@ final class AbsurdTest extends IntegrationTestCase
         $taskInfo = $this->absurd->getTask($result->taskId);
 
         self::assertEquals('completed', $taskInfo->state);
-        self::assertSame(['result' => 'timeout'], $taskInfo->completedPayload, 'TimeOut error must be thrown inside the task');
+        self::assertSame(
+            ['result' => 'timeout'],
+            $taskInfo->completedPayload,
+            'TimeOut error must be thrown inside the task',
+        );
     }
 }
