@@ -11,8 +11,6 @@ use Ruudk\Absurd\Task\RegisterOptions;
 use Ruudk\Absurd\Task\RetryStrategy;
 use Ruudk\Absurd\Task\SpawnOptions;
 
-use function PHPUnit\Framework\assertEquals;
-
 final class AbsurdTest extends IntegrationTestCase
 {
     #[Test]
