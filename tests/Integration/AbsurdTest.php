@@ -4,6 +4,8 @@ namespace Ruudk\Absurd\Integration;
 
 use PHPUnit\Framework\Attributes\Test;
 use Ruudk\Absurd\Exception\TaskExecutionError;
+use Ruudk\Absurd\Exception\TimeoutError;
+use Ruudk\Absurd\Execution\AwaitEventOptions;
 use Ruudk\Absurd\Task\Context as TaskContext;
 use Ruudk\Absurd\Task\RegisterOptions;
 use Ruudk\Absurd\Task\RetryStrategy;
@@ -173,5 +175,37 @@ final class AbsurdTest extends IntegrationTestCase
         $this->expectExceptionMessage('taskId must be a non-empty string');
 
         $this->absurd->cancelTask('');
+    }
+
+    #[Test]
+    public function waitForEventTaskThrowsTimeoutErrorInsideTask(): void
+    {
+        $this->absurd->registerTask('timeout-task', static function (array $p, TaskContext $ctx) {
+            try {
+                $ctx->awaitEvent('test-event', new AwaitEventOptions(timeout: 0));
+            } catch (TimeoutError) {
+                return ['result' => 'timeout'];
+            }
+            return ['result' => 'done'];
+        });
+
+        $result = $this->absurd->spawn('timeout-task', ['input' => 'value'], new SpawnOptions(maxAttempts: 2));
+
+        $this->processAllTasks();
+
+        $taskInfo = $this->absurd->getTask($result->taskId);
+
+        self::assertSame('sleeping', $taskInfo->state, 'task must be sleeping after initial processing');
+
+        $this->processAllTasks();
+
+        $taskInfo = $this->absurd->getTask($result->taskId);
+
+        self::assertSame('completed', $taskInfo->state);
+        self::assertSame(
+            ['result' => 'timeout'],
+            $taskInfo->completedPayload,
+            'TimeOut error must be thrown inside the task',
+        );
     }
 }
