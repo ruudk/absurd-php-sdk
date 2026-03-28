@@ -184,7 +184,7 @@ final class AbsurdTest extends IntegrationTestCase
     {
         $this->absurd->registerTask('timeout-task', static function (array $p, TaskContext $ctx) {
             try {
-                $ctx->awaitEvent('test-event', new AwaitEventOptions(timeout: 1));
+                $ctx->awaitEvent('test-event', new AwaitEventOptions(timeout: 0));
             } catch (TimeoutError) {
                 return ['result' => 'timeout'];
             }
@@ -197,15 +197,13 @@ final class AbsurdTest extends IntegrationTestCase
 
         $taskInfo = $this->absurd->getTask($result->taskId);
 
-        assertEquals('sleeping', $taskInfo->state, 'task must be sleeping after initial processing');
-
-        sleep(1);
+        self::assertSame('sleeping', $taskInfo->state, 'task must be sleeping after initial processing');
 
         $this->processAllTasks();
 
         $taskInfo = $this->absurd->getTask($result->taskId);
 
-        self::assertEquals('completed', $taskInfo->state);
+        self::assertSame('completed', $taskInfo->state);
         self::assertSame(
             ['result' => 'timeout'],
             $taskInfo->completedPayload,
