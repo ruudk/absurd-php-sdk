@@ -80,4 +80,34 @@ final readonly class Spawner
             created: $row['created'],
         );
     }
+
+    public function retry(string $taskId, string $queue, RetryOptions $options = new RetryOptions()): SpawnResult
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT task_id, run_id, attempt, created FROM absurd.retry_task(:queue, :task_id, :retry_options)',
+        );
+
+        if ($stmt === false) {
+            throw new TaskExecutionError('Failed to prepare retry task query');
+        }
+
+        $stmt->execute([
+            'queue' => $queue,
+            'task_id' => $taskId,
+            'retry_options' => json_encode($options->jsonSerialize()),
+        ]);
+
+        /** @var array{task_id: string, run_id: string, attempt: int, created: bool}|false $row */
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            throw new TaskExecutionError('Failed to retry task');
+        }
+
+        return new SpawnResult(
+            taskId: $row['task_id'],
+            runId: $row['run_id'],
+            attempt: $row['attempt'],
+            created: $row['created'],
+        );
+    }
 }
