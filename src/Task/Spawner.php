@@ -64,7 +64,7 @@ final readonly class Spawner
             'queue' => $effectiveQueue,
             'task_name' => $taskName,
             'params' => $this->serializer->encode($params),
-            'options' => json_encode($effectiveOptions->jsonSerialize()),
+            'options' => json_encode($effectiveOptions, JSON_THROW_ON_ERROR),
         ]);
 
         /** @var array{task_id: string, run_id: string, attempt: int, created: bool}|false $row */
