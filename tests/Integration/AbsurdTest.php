@@ -208,4 +208,25 @@ final class AbsurdTest extends IntegrationTestCase
             'TimeOut error must be thrown inside the task',
         );
     }
+
+    #[Test]
+    public function maxAttemptsFromSpawnOptionsAreCorrectlySentToAbsurd(): void
+    {
+        $this->absurd->registerTask('my-task', static fn(array $p, TaskContext $ctx) => throw new \Exception('fail'));
+
+        $result = $this->absurd->spawn('my-task', ['data' => 'test'], new SpawnOptions(
+            maxAttempts: 1,
+        ));
+
+        static::assertNotEmpty($result->taskId);
+        static::assertSame(1, $result->attempt);
+
+        $this->processAllTasks();
+
+        $taskInfo = $this->absurd->getTask($result->taskId);
+
+        static::assertSame('failed', $taskInfo->state);
+        static::assertSame(1, $taskInfo->attempts);
+    }
+
 }
