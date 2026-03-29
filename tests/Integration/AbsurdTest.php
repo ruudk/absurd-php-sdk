@@ -214,9 +214,7 @@ final class AbsurdTest extends IntegrationTestCase
     {
         $this->absurd->registerTask('my-task', static fn(array $p, TaskContext $ctx) => throw new \Exception('fail'));
 
-        $result = $this->absurd->spawn('my-task', ['data' => 'test'], new SpawnOptions(
-            maxAttempts: 1,
-        ));
+        $result = $this->absurd->spawn('my-task', ['data' => 'test'], new SpawnOptions(maxAttempts: 1));
 
         static::assertNotEmpty($result->taskId);
         static::assertSame(1, $result->attempt);
@@ -228,5 +226,4 @@ final class AbsurdTest extends IntegrationTestCase
         static::assertSame('failed', $taskInfo->state);
         static::assertSame(1, $taskInfo->attempts);
     }
-
 }
