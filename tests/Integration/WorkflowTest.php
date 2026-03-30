@@ -141,6 +141,37 @@ final class WorkflowTest extends IntegrationTestCase
 
         static::assertCount(3, $tasks);
     }
+
+    #[Test]
+    public function multipleAwaitEventsWork(): void
+    {
+        $this->absurd->registerTask('subtask', function (array $params, TaskContext $ctx) {
+            $ctx->emitEvent('event-' . $ctx->taskId);
+            return ['id' => $ctx->taskId];
+        });
+
+        $this->absurd->registerTask('maintask', function (array $params, TaskContext $ctx) {
+            $eventsToWakeOn = $ctx->step('spawn-sub-tasks', function () {
+                $subtaskA = $this->absurd->spawn('subtask', []);
+                $subtaskB = $this->absurd->spawn('subtask', []);
+                return [
+                    'event-' . $subtaskA->taskId,
+                    'event-' . $subtaskB->taskId,
+                ];
+            });
+            array_map(fn($e) => $ctx->awaitEvent($e), $eventsToWakeOn);
+        });
+
+        $spawned = $this->absurd->spawn('maintask', []);
+
+        // need to call multiple times to spawn all tasks and wait for the emitEvents
+        $this->processAllTasks();
+        $this->processAllTasks();
+        $this->processAllTasks();
+
+        $taskInfo = $this->absurd->getTask($spawned->taskId);
+        static::assertSame('completed', $taskInfo->state);
+    }
 }
 
 final readonly class TestPayload
