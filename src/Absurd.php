@@ -19,7 +19,6 @@ use Ruudk\Absurd\Serialization\Serializer;
 use Ruudk\Absurd\Task\ClaimedTask;
 use Ruudk\Absurd\Task\Claimer;
 use Ruudk\Absurd\Task\ClaimOptions;
-use Ruudk\Absurd\Task\Context as TaskContext;
 use Ruudk\Absurd\Task\RegisterOptions;
 use Ruudk\Absurd\Task\Registration;
 use Ruudk\Absurd\Task\RetryOptions;
@@ -30,7 +29,7 @@ use Ruudk\Absurd\Task\TaskInfo;
 use Ruudk\Absurd\Worker\Worker;
 use Ruudk\Absurd\Worker\WorkerOptions;
 
-final class Absurd
+final class Absurd implements AbsurdInterface
 {
     private string $queueName;
 
@@ -48,7 +47,7 @@ final class Absurd
     }
 
     /**
-     * @param callable(mixed, TaskContext): mixed $handler
+     * @throws TaskExecutionError
      */
     public function registerTask(
         string $name,
@@ -82,6 +81,10 @@ final class Absurd
         );
     }
 
+    /**
+     * @throws TaskExecutionError
+     * @throws \JsonException
+     */
     public function spawn(
         string $taskName,
         mixed $params,
@@ -100,6 +103,9 @@ final class Absurd
         return $spawner->spawn($taskName, $params, $effectiveOptions, $queue, $this->registry[$taskName] ?? null);
     }
 
+    /**
+     * @throws TaskExecutionError
+     */
     public function retryTask(
         string $taskId,
         RetryOptions $options = new RetryOptions(),
@@ -134,14 +140,6 @@ final class Absurd
         ]);
     }
 
-    /**
-     * Cancel a task by its ID.
-     *
-     * Running tasks will stop at their next checkpoint, heartbeat, or await event.
-     * This operation is idempotent - cancelling an already cancelled task has no effect.
-     *
-     * @throws TaskExecutionError If taskId is empty
-     */
     public function cancelTask(string $taskId, ?string $queueName = null): void
     {
         if ($taskId === '') {
@@ -154,9 +152,6 @@ final class Absurd
         ]);
     }
 
-    /**
-     * @return list<ClaimedTask>
-     */
     public function claimTasks(ClaimOptions $options = new ClaimOptions()): array
     {
         $claimer = new Claimer($this->connection, $this->queueName, $this->serializer);
@@ -174,20 +169,12 @@ final class Absurd
         $this->connection->execute('SELECT absurd.create_queue(:queue)', ['queue' => $queue]);
     }
 
-    /**
-     * Drop a queue and all its internal tables.
-     */
     public function dropQueue(?string $queueName = null): void
     {
         $queue = $queueName ?? $this->queueName;
         $this->connection->execute('SELECT absurd.drop_queue(:queue)', ['queue' => $queue]);
     }
 
-    /**
-     * List all queue names.
-     *
-     * @return list<string>
-     */
     public function listQueues(): array
     {
         try {
@@ -210,14 +197,6 @@ final class Absurd
         $executor->execute($task, $claimTimeout, $fatalOnLeaseTimeout);
     }
 
-    /**
-     * Process a batch of tasks synchronously (one-shot processing).
-     *
-     * Claims and executes tasks immediately, then returns. Useful for testing
-     * or when you want to process tasks without running a long-lived worker.
-     *
-     * @return int Number of tasks processed
-     */
     public function workBatch(WorkerOptions $options = new WorkerOptions()): int
     {
         $tasks = $this->claimTasks(new ClaimOptions(
@@ -233,15 +212,6 @@ final class Absurd
         return count($tasks);
     }
 
-    /**
-     * Clean up old completed or failed tasks.
-     *
-     * Removes tasks that have been completed or failed for longer than the specified TTL.
-     *
-     * @param int $ttlSeconds Tasks older than this are eligible for cleanup
-     * @param int $limit Maximum number of tasks to clean up in one call
-     * @return int Number of tasks cleaned up
-     */
     public function cleanupTasks(int $ttlSeconds, int $limit = 1000, ?string $queue = null): int
     {
         try {
@@ -259,15 +229,6 @@ final class Absurd
         }
     }
 
-    /**
-     * Clean up old consumed events.
-     *
-     * Removes events that have been consumed for longer than the specified TTL.
-     *
-     * @param int $ttlSeconds Events older than this are eligible for cleanup
-     * @param int $limit Maximum number of events to clean up in one call
-     * @return int Number of events cleaned up
-     */
     public function cleanupEvents(int $ttlSeconds, int $limit = 1000, ?string $queue = null): int
     {
         try {
@@ -285,11 +246,6 @@ final class Absurd
         }
     }
 
-    /**
-     * Get task information by ID.
-     *
-     * @return TaskInfo|null The task info, or null if the task doesn't exist
-     */
     public function getTask(string $taskId, ?string $queueName = null): ?TaskInfo
     {
         if ($taskId === '') {

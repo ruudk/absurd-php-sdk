@@ -2,7 +2,7 @@
 
 namespace Ruudk\Absurd\Examples\Agent;
 
-use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\AbsurdInterface;
 use Ruudk\Absurd\Task\SpawnOptions;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -24,7 +24,7 @@ final class AskCommand extends Command
     private const POLL_INTERVAL = 0.2;
 
     public function __construct(
-        private readonly Absurd $absurd,
+        private readonly AbsurdInterface $absurd,
     ) {
         parent::__construct();
     }

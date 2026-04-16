@@ -3,7 +3,7 @@
 namespace Ruudk\Absurd\Examples\Agent;
 
 use Psr\Log\LoggerInterface;
-use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\AbsurdInterface;
 use Ruudk\Absurd\Task\RegisterOptions;
 use Ruudk\Absurd\Worker\WorkerOptions;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -21,7 +21,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class ConsumeCommand extends Command
 {
     public function __construct(
-        private readonly Absurd $absurd,
+        private readonly AbsurdInterface $absurd,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();

@@ -2,7 +2,7 @@
 
 namespace Ruudk\Absurd\Examples\Ecommerce;
 
-use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\AbsurdInterface;
 use Ruudk\Absurd\Task\Context as TaskContext;
 
 /**
@@ -17,7 +17,7 @@ use Ruudk\Absurd\Task\Context as TaskContext;
 final readonly class FraudCheckTask
 {
     public function __construct(
-        private Absurd $absurd,
+        private AbsurdInterface $absurd,
     ) {}
 
     /**
