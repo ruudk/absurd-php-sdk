@@ -13,8 +13,10 @@
         "php": "^8.4",
         "ext-pdo": "*",
         "psr/event-dispatcher": "^1.0",
-        "psr/log": "^3.0",
-        "symfony/serializer": "^7.4 || ^8.0"
+        "psr/log": "^3.0"
+    },
+    "suggest": {
+        "symfony/serializer": "for typed task payloads"
     },
     "require-dev": {
         "ext-bcmath": "*",
@@ -28,7 +30,7 @@
         "symfony/console": "^7.4 || ^8.0",
         "symfony/dotenv": "^8.0",
         "symfony/event-dispatcher": "^8.0",
-        "symfony/property-access": "^8.0"
+        "symfony/serializer": "^7.4 || ^8.0"
     },
     "autoload": {
         "psr-4": {

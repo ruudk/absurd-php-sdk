@@ -38,7 +38,7 @@ final class Absurd implements AbsurdInterface
 
     public function __construct(
         private readonly Connection $connection,
-        private readonly Serializer $serializer,
+        private readonly SerializerInterface $serializer = new JsonSerializer(),
         private readonly string $defaultQueueName = 'default',
         private readonly int $defaultMaxAttempts = 5,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,

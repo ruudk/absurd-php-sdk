@@ -23,11 +23,24 @@ interface AbsurdInterface
     /**
      * @param callable(mixed, TaskContext): mixed $handler
      */
-    public function registerTask(string $name, callable $handler, RegisterOptions $options = new RegisterOptions()): void;
+    public function registerTask(
+        string $name,
+        callable $handler,
+        RegisterOptions $options = new RegisterOptions(),
+    ): void;
 
-    public function spawn(string $taskName, mixed $params, SpawnOptions $options = new SpawnOptions(), ?string $queue = null): SpawnResult;
+    public function spawn(
+        string $taskName,
+        mixed $params,
+        SpawnOptions $options = new SpawnOptions(),
+        ?string $queue = null,
+    ): SpawnResult;
 
-    public function retryTask(string $taskId, RetryOptions $options = new RetryOptions(), ?string $queue = null): SpawnResult;
+    public function retryTask(
+        string $taskId,
+        RetryOptions $options = new RetryOptions(),
+        ?string $queue = null,
+    ): SpawnResult;
 
     public function emitEvent(string $eventName, mixed $payload = null, ?string $queueName = null): void;
 
@@ -62,7 +75,12 @@ interface AbsurdInterface
      */
     public function listQueues(): array;
 
-    public function executeTask(ClaimedTask $task, int $claimTimeout, bool $fatalOnLeaseTimeout = true, LoggerInterface $logger = new NullLogger()): void;
+    public function executeTask(
+        ClaimedTask $task,
+        int $claimTimeout,
+        bool $fatalOnLeaseTimeout = true,
+        LoggerInterface $logger = new NullLogger(),
+    ): void;
 
     /**
      * Process a batch of tasks synchronously (one-shot processing).

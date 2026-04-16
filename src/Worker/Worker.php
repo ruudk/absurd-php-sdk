@@ -21,8 +21,8 @@ final class Worker
      * @internal
      */
     public function __construct(
-        private readonly AbsurdInterface           $absurd,
-        private readonly WorkerOptions             $options,
+        private readonly AbsurdInterface $absurd,
+        private readonly WorkerOptions $options,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
     ) {}
 

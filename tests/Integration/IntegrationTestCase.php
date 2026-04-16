@@ -5,6 +5,7 @@ namespace Ruudk\Absurd\Integration;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\Serialization\SerializerInterface;
 use Ruudk\Absurd\Connection\PdoConnection;
 use Ruudk\Absurd\Serialization\SymfonySerializer;
 use Ruudk\Absurd\Task\ClaimOptions;
@@ -44,7 +45,7 @@ abstract class IntegrationTestCase extends TestCase
         $this->absurd->createQueue();
     }
 
-    private function createSerializer(): SymfonySerializer
+    protected function createSerializer(): SerializerInterface
     {
         return new SymfonySerializer(new Serializer(normalizers: [
             new BackedEnumNormalizer(),
