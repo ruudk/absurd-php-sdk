@@ -30,6 +30,7 @@
         "symfony/console": "^7.4 || ^8.0",
         "symfony/dotenv": "^8.0",
         "symfony/event-dispatcher": "^8.0",
+        "symfony/property-access": "^8.0",
         "symfony/serializer": "^7.4 || ^8.0"
     },
     "autoload": {
