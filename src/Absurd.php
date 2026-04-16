@@ -9,6 +9,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use ReflectionFunction;
 use ReflectionNamedType;
+use Ruudk\Absurd\Event\BeforeRetryEvent;
 use Ruudk\Absurd\Event\BeforeSpawnEvent;
 use Ruudk\Absurd\Exception\TaskExecutionError;
 use Ruudk\Absurd\Execution\Context as ExecutionContext;
@@ -20,6 +21,7 @@ use Ruudk\Absurd\Task\ClaimOptions;
 use Ruudk\Absurd\Task\Context as TaskContext;
 use Ruudk\Absurd\Task\RegisterOptions;
 use Ruudk\Absurd\Task\Registration;
+use Ruudk\Absurd\Task\RetryOptions;
 use Ruudk\Absurd\Task\Spawner;
 use Ruudk\Absurd\Task\SpawnOptions;
 use Ruudk\Absurd\Task\SpawnResult;
@@ -95,6 +97,27 @@ final class Absurd
 
         $spawner = new Spawner($this->pdo, $this->serializer, $this->defaultMaxAttempts);
         return $spawner->spawn($taskName, $params, $effectiveOptions, $queue, $this->registry[$taskName] ?? null);
+    }
+
+    public function retryTask(
+        string $taskId,
+        RetryOptions $options = new RetryOptions(),
+        ?string $queue = null,
+    ): SpawnResult {
+        if ($taskId === '') {
+            throw new TaskExecutionError('taskId must be a non-empty string');
+        }
+
+        $effectiveOptions = $options;
+
+        if ($this->eventDispatcher !== null) {
+            $event = new BeforeRetryEvent($taskId, $effectiveOptions);
+            $this->eventDispatcher->dispatch($event);
+            $effectiveOptions = $event->options;
+        }
+
+        $spawner = new Spawner($this->pdo, $this->serializer, $this->defaultMaxAttempts);
+        return $spawner->retry($taskId, $queue ?? $this->queueName, $effectiveOptions);
     }
 
     public function emitEvent(string $eventName, mixed $payload = null, ?string $queueName = null): void

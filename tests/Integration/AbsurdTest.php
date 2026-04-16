@@ -8,6 +8,7 @@ use Ruudk\Absurd\Exception\TimeoutError;
 use Ruudk\Absurd\Execution\AwaitEventOptions;
 use Ruudk\Absurd\Task\Context as TaskContext;
 use Ruudk\Absurd\Task\RegisterOptions;
+use Ruudk\Absurd\Task\RetryOptions;
 use Ruudk\Absurd\Task\RetryStrategy;
 use Ruudk\Absurd\Task\SpawnOptions;
 
@@ -207,6 +208,67 @@ final class AbsurdTest extends IntegrationTestCase
             $taskInfo->completedPayload,
             'TimeOut error must be thrown inside the task',
         );
+    }
+
+    #[Test]
+    public function retryTaskIncreasesAttempt(): void
+    {
+        $this->absurd->registerTask(
+            'error-task',
+            static function (array $p, TaskContext $ctx) {
+                throw new \Exception('Nope!');
+            },
+            new RegisterOptions(defaultMaxAttempts: 1),
+        );
+
+        $spawnResult = $this->absurd->spawn('error-task', []);
+
+        $this->processAllTasks();
+
+        $taskInfo = $this->absurd->getTask($spawnResult->taskId);
+
+        self::assertSame('failed', $taskInfo->state, 'task must fail');
+        self::assertSame(1, $taskInfo->attempts, 'task must be 1');
+
+        $retryResult = $this->absurd->retryTask($spawnResult->taskId);
+
+        self::assertSame($retryResult->taskId, $spawnResult->taskId, 'retried task must have the same task-id');
+        self::assertFalse($retryResult->created, 'retried task must not be recreated');
+        self::assertSame(2, $retryResult->attempt, 'retried task must now have an additional attempt');
+
+        $this->processAllTasks();
+
+        $taskInfo = $this->absurd->getTask($retryResult->taskId);
+
+        self::assertSame('failed', $taskInfo->state);
+        self::assertSame(2, $taskInfo->attempts, 'must be at attempt 2');
+    }
+
+    #[Test]
+    public function retryTaskWithSpawnNewCreatesNewTask(): void
+    {
+        $this->absurd->registerTask(
+            'error-task',
+            static function (array $p, TaskContext $ctx) {
+                throw new \Exception('Nope!');
+            },
+            new RegisterOptions(defaultMaxAttempts: 1),
+        );
+
+        $spawnResult = $this->absurd->spawn('error-task', []);
+
+        $this->processAllTasks();
+
+        $taskInfo = $this->absurd->getTask($spawnResult->taskId);
+
+        self::assertSame('failed', $taskInfo->state, 'task must fail');
+        self::assertSame(1, $taskInfo->attempts, 'task must be 1');
+
+        $retryResult = $this->absurd->retryTask($spawnResult->taskId, new RetryOptions(spawnNewTask: true));
+
+        self::assertNotSame($retryResult->taskId, $spawnResult->taskId, 'retried task must nwo have a new task-id');
+        self::assertTrue($retryResult->created, 'retried task must be recreated');
+        self::assertSame(1, $retryResult->attempt, 'new task must now have initial attempt number');
     }
 
     #[Test]
