@@ -43,17 +43,17 @@ final readonly class PdoConnection implements Connection
         }
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    public function fetch(string $sql, array $params = []): ?array
+    public function fetch(string $sql, array $params = []): array|false
     {
         try {
             $stmt = $this->prepare($sql);
             $stmt->execute($params);
-            /** @var array<string, mixed>|false $result */
+            /**
+             * @var array<string, mixed>|false $result
+             * @mago-expect lint:inline-variable-return for satisfying the analysier
+             */
             $result = $stmt->fetch(\PDO::FETCH_ASSOC);
-            return $result === false ? null : $result;
+            return $result;
         } catch (\PDOException $e) {
             throw new QueryException((string) $e->getCode(), $e->getMessage(), $e);
         }

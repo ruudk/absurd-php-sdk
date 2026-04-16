@@ -19,7 +19,7 @@ interface Connection
      * @param array<string, mixed> $params
      * @throws QueryException
      */
-    public function fetch(string $sql, array $params = []): ?array;
+    public function fetch(string $sql, array $params = []): array|false;
 
     public function execute(string $sql, array $params = []): void;
 
