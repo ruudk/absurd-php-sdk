@@ -1,6 +1,6 @@
 .PHONY: setup up down clean help
 
-ABSURD_VERSION := 0.0.7
+ABSURD_VERSION := 0.3.0
 ABSURD_DIR := .absurd
 ABSURDCTL := $(ABSURD_DIR)/absurdctl
 PGDATABASE_URL := postgres://absurd:absurd@localhost:54329/absurd?sslmode=disable

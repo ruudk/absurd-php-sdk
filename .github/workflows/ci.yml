@@ -134,7 +134,7 @@ jobs:
           dependency-versions: ${{ matrix.dependencies }}
 
       - name: Download absurdctl
-        run: gh release download 0.0.7 --repo earendil-works/absurd --pattern absurdctl
+        run: gh release download 0.3.0 --repo earendil-works/absurd --pattern absurdctl
         env:
           GH_TOKEN: ${{ github.token }}
 
