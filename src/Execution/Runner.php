@@ -3,7 +3,6 @@
 namespace Ruudk\Absurd\Execution;
 
 use DateTimeImmutable;
-use PDO;
 use ReflectionClass;
 use Ruudk\Absurd\Exception\SuspendTask;
 use Ruudk\Absurd\Exception\TaskExecutionError;
@@ -116,27 +115,21 @@ final readonly class Runner
             throw new TimeoutError($eventName);
         }
 
-        $stmt = $this->context->pdo->prepare(
-            'SELECT should_suspend::int, payload FROM absurd.await_event(:queue, :task_id, :run_id, :checkpoint_name, :event_name, :timeout)',
-        );
-
-        if ($stmt === false) {
-            throw new TaskExecutionError('Failed to prepare await event query');
-        }
-
-        $stmt->execute([
-            'queue' => $this->context->queueName,
-            'task_id' => $this->task->taskId,
-            'run_id' => $this->task->runId,
-            'checkpoint_name' => $checkpoint->name,
-            'event_name' => $eventName,
-            'timeout' => $timeout,
-        ]);
-
-        /** @var array{should_suspend: string, payload: string|null}|false $row */
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($row === false) {
-            throw new TaskExecutionError('Failed to await event');
+        try {
+            /** @var array{should_suspend: string, payload: string|null}|false $row */
+            $row = $this->context->connection->fetch(
+                'SELECT should_suspend::int, payload FROM absurd.await_event(:queue, :task_id, :run_id, :checkpoint_name, :event_name, :timeout)',
+                [
+                    'queue' => $this->context->queueName,
+                    'task_id' => $this->task->taskId,
+                    'run_id' => $this->task->runId,
+                    'checkpoint_name' => $checkpoint->name,
+                    'event_name' => $eventName,
+                    'timeout' => $timeout,
+                ],
+            );
+        } catch (\Throwable $t) {
+            throw new TaskExecutionError('Failed to await event', $t);
         }
 
         if (!$row['should_suspend']) {
@@ -223,9 +216,6 @@ final readonly class Runner
      */
     private function executeQuery(string $sql, array $params): void
     {
-        $stmt = $this->context->pdo->prepare($sql);
-        if ($stmt !== false) {
-            $stmt->execute($params);
-        }
+        $this->context->connection->execute($sql, $params);
     }
 }

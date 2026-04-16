@@ -2,7 +2,7 @@
 
 namespace Ruudk\Absurd\Execution;
 
-use PDO;
+use Ruudk\Absurd\Connection\Connection;
 use Ruudk\Absurd\Serialization\Serializer;
 
 /**
@@ -13,7 +13,7 @@ use Ruudk\Absurd\Serialization\Serializer;
 final readonly class Context
 {
     public function __construct(
-        public PDO $pdo,
+        public Connection $connection,
         public string $queueName,
         public int $claimTimeout,
         public Serializer $serializer,

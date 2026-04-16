@@ -29,6 +29,7 @@ use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use Monolog\Processor\PsrLogMessageProcessor;
 use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\Connection\PdoConnection;
 use Ruudk\Absurd\Examples\Agent\AskCommand;
 use Ruudk\Absurd\Examples\Agent\ConsumeCommand;
 use Ruudk\Absurd\Examples\ColorizedTaskProcessor;
@@ -70,7 +71,7 @@ $serializer = new SymfonySerializer(new Serializer(normalizers: [
 ], encoders: [new JsonEncoder()]));
 
 // Create Absurd client
-$absurd = new Absurd($pdo, $serializer, 'agents');
+$absurd = new Absurd(new PdoConnection($pdo), $serializer, 'agents');
 
 // Create and run the console application
 $app = new Application('AI Agent', '1.0.0');

@@ -145,7 +145,7 @@ final class WorkflowTest extends IntegrationTestCase
     #[Test]
     public function multipleAwaitEventsWork(): void
     {
-        $this->absurd->registerTask('subtask', function (array $params, TaskContext $ctx) {
+        $this->absurd->registerTask('subtask', static function (array $params, TaskContext $ctx) {
             $ctx->emitEvent('event-' . $ctx->taskId);
             return ['id' => $ctx->taskId];
         });
@@ -159,7 +159,7 @@ final class WorkflowTest extends IntegrationTestCase
                     'event-' . $subtaskB->taskId,
                 ];
             });
-            array_map(fn($e) => $ctx->awaitEvent($e), $eventsToWakeOn);
+            array_map($ctx->awaitEvent(...), $eventsToWakeOn);
         });
 
         $spawned = $this->absurd->spawn('maintask', []);

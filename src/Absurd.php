@@ -3,14 +3,15 @@
 namespace Ruudk\Absurd;
 
 use Closure;
-use PDO;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use ReflectionFunction;
 use ReflectionNamedType;
+use Ruudk\Absurd\Connection\Connection;
 use Ruudk\Absurd\Event\BeforeRetryEvent;
 use Ruudk\Absurd\Event\BeforeSpawnEvent;
+use Ruudk\Absurd\Exception\QueryException;
 use Ruudk\Absurd\Exception\TaskExecutionError;
 use Ruudk\Absurd\Execution\Context as ExecutionContext;
 use Ruudk\Absurd\Execution\Executor;
@@ -37,7 +38,7 @@ final class Absurd
     private array $registry = [];
 
     public function __construct(
-        private readonly PDO $pdo,
+        private readonly Connection $connection,
         private readonly Serializer $serializer,
         private readonly string $defaultQueueName = 'default',
         private readonly int $defaultMaxAttempts = 5,
@@ -95,7 +96,7 @@ final class Absurd
             $effectiveOptions = $event->options;
         }
 
-        $spawner = new Spawner($this->pdo, $this->serializer, $this->defaultMaxAttempts);
+        $spawner = new Spawner($this->connection, $this->serializer, $this->defaultMaxAttempts);
         return $spawner->spawn($taskName, $params, $effectiveOptions, $queue, $this->registry[$taskName] ?? null);
     }
 
@@ -116,7 +117,7 @@ final class Absurd
             $effectiveOptions = $event->options;
         }
 
-        $spawner = new Spawner($this->pdo, $this->serializer, $this->defaultMaxAttempts);
+        $spawner = new Spawner($this->connection, $this->serializer, $this->defaultMaxAttempts);
         return $spawner->retry($taskId, $queue ?? $this->queueName, $effectiveOptions);
     }
 
@@ -126,7 +127,7 @@ final class Absurd
             throw new TaskExecutionError('eventName must be a non-empty string');
         }
 
-        $this->executeQuery('SELECT absurd.emit_event(:queue, :event, :payload)', [
+        $this->connection->execute('SELECT absurd.emit_event(:queue, :event, :payload)', [
             'queue' => $queueName ?? $this->queueName,
             'event' => $eventName,
             'payload' => $this->serializer->encode($payload),
@@ -147,7 +148,7 @@ final class Absurd
             throw new TaskExecutionError('taskId must be a non-empty string');
         }
 
-        $this->executeQuery('SELECT absurd.cancel_task(:queue, :task_id)', [
+        $this->connection->execute('SELECT absurd.cancel_task(:queue, :task_id)', [
             'queue' => $queueName ?? $this->queueName,
             'task_id' => $taskId,
         ]);
@@ -158,7 +159,7 @@ final class Absurd
      */
     public function claimTasks(ClaimOptions $options = new ClaimOptions()): array
     {
-        $claimer = new Claimer($this->pdo, $this->queueName, $this->serializer);
+        $claimer = new Claimer($this->connection, $this->queueName, $this->serializer);
         return $claimer->claim($options->workerId, $options->claimTimeout, $options->batchSize);
     }
 
@@ -170,7 +171,7 @@ final class Absurd
     public function createQueue(?string $queueName = null): void
     {
         $queue = $queueName ?? $this->queueName;
-        $this->executeQuery('SELECT absurd.create_queue(:queue)', ['queue' => $queue]);
+        $this->connection->execute('SELECT absurd.create_queue(:queue)', ['queue' => $queue]);
     }
 
     /**
@@ -179,7 +180,7 @@ final class Absurd
     public function dropQueue(?string $queueName = null): void
     {
         $queue = $queueName ?? $this->queueName;
-        $this->executeQuery('SELECT absurd.drop_queue(:queue)', ['queue' => $queue]);
+        $this->connection->execute('SELECT absurd.drop_queue(:queue)', ['queue' => $queue]);
     }
 
     /**
@@ -189,16 +190,13 @@ final class Absurd
      */
     public function listQueues(): array
     {
-        $stmt = $this->pdo->prepare('SELECT queue_name FROM absurd.list_queues()');
-        if ($stmt === false) {
+        try {
+            /** @var list<array{queue_name: string}> $rows */
+            $rows = $this->connection->fetchAll('SELECT queue_name FROM absurd.list_queues()');
+            return array_values(array_column($rows, 'queue_name'));
+        } catch (QueryException) {
             return [];
         }
-        $stmt->execute();
-
-        /** @var list<array{queue_name: string}> $rows */
-        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        return array_values(array_column($rows, 'queue_name'));
     }
 
     public function executeTask(
@@ -207,7 +205,7 @@ final class Absurd
         bool $fatalOnLeaseTimeout = true,
         LoggerInterface $logger = new NullLogger(),
     ): void {
-        $context = new ExecutionContext($this->pdo, $this->queueName, $claimTimeout, $this->serializer);
+        $context = new ExecutionContext($this->connection, $this->queueName, $claimTimeout, $this->serializer);
         $executor = new Executor($context, $this->registry, $logger, $this->eventDispatcher);
         $executor->execute($task, $claimTimeout, $fatalOnLeaseTimeout);
     }
@@ -246,19 +244,19 @@ final class Absurd
      */
     public function cleanupTasks(int $ttlSeconds, int $limit = 1000, ?string $queue = null): int
     {
-        $stmt = $this->pdo->prepare('SELECT absurd.cleanup_tasks(:queue, :ttl_seconds, :limit)');
-        if ($stmt === false) {
+        try {
+            $result = $this->connection->scalar('SELECT absurd.cleanup_tasks(:queue, :ttl_seconds, :limit)', [
+                [
+                    'queue' => $queue ?? $this->queueName,
+                    'ttl_seconds' => $ttlSeconds,
+                    'limit' => $limit,
+                ],
+            ]);
+
+            return is_numeric($result) ? (int) $result : 0;
+        } catch (\Throwable) {
             return 0;
         }
-        $stmt->execute([
-            'queue' => $queue ?? $this->queueName,
-            'ttl_seconds' => $ttlSeconds,
-            'limit' => $limit,
-        ]);
-
-        /** @var int|string|false $result */
-        $result = $stmt->fetchColumn();
-        return is_numeric($result) ? (int) $result : 0;
     }
 
     /**
@@ -272,19 +270,19 @@ final class Absurd
      */
     public function cleanupEvents(int $ttlSeconds, int $limit = 1000, ?string $queue = null): int
     {
-        $stmt = $this->pdo->prepare('SELECT absurd.cleanup_events(:queue, :ttl_seconds, :limit)');
-        if ($stmt === false) {
+        try {
+            $result = $this->connection->scalar('SELECT absurd.cleanup_events(:queue, :ttl_seconds, :limit)', [
+                [
+                    'queue' => $queue ?? $this->queueName,
+                    'ttl_seconds' => $ttlSeconds,
+                    'limit' => $limit,
+                ],
+            ]);
+
+            return is_numeric($result) ? (int) $result : 0;
+        } catch (\Throwable) {
             return 0;
         }
-        $stmt->execute([
-            'queue' => $queue ?? $this->queueName,
-            'ttl_seconds' => $ttlSeconds,
-            'limit' => $limit,
-        ]);
-
-        /** @var int|string|false $result */
-        $result = $stmt->fetchColumn();
-        return is_numeric($result) ? (int) $result : 0;
     }
 
     /**
@@ -303,19 +301,21 @@ final class Absurd
 
         // Using prepared statement with quoted table name for safety
         // Note: table name is derived from queue name which is controlled internally
-        $stmt = $this->pdo->prepare("SELECT task_id, task_name, state, attempts, completed_payload
+        try {
+            /** @var array{task_id: string, task_name: string, state: string, attempts: int, completed_payload: string|null}|false $row */
+            $row = $this->connection->fetch(
+                "SELECT task_id, task_name, state, attempts, completed_payload
              FROM absurd.\"{$tableName}\"
-             WHERE task_id = :task_id");
-        if ($stmt === false) {
-            throw new TaskExecutionError('Failed to prepare query for getTask');
+             WHERE task_id = :task_id",
+                [
+                    'task_id' => $taskId,
+                ],
+            );
+        } catch (QueryException $e) {
+            throw new TaskExecutionError('Failed to execute getTask', $e);
         }
 
-        $stmt->execute(['task_id' => $taskId]);
-
-        /** @var array{task_id: string, task_name: string, state: string, attempts: int, completed_payload: string|null}|false $row */
-        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-
-        if ($row === false) {
+        if (!$row) {
             return null;
         }
 
@@ -334,17 +334,6 @@ final class Absurd
             attempts: (int) $row['attempts'],
             completedPayload: $completedPayload,
         );
-    }
-
-    /**
-     * @param array<string, mixed> $params
-     */
-    private function executeQuery(string $sql, array $params): void
-    {
-        $stmt = $this->pdo->prepare($sql);
-        if ($stmt !== false) {
-            $stmt->execute($params);
-        }
     }
 
     /**

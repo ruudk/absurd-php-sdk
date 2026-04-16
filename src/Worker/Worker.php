@@ -2,10 +2,10 @@
 
 namespace Ruudk\Absurd\Worker;
 
-use PDOException;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Event\TaskErrorEvent;
+use Ruudk\Absurd\Exception\QueryException;
 use Ruudk\Absurd\Task\ClaimedTask;
 use Ruudk\Absurd\Task\ClaimOptions;
 use Throwable;
@@ -83,8 +83,7 @@ final class Worker
                             'message' => $exception->getMessage(),
                         ]);
 
-                        // Rethrow connection errors, handle other task errors
-                        if ($this->isConnectionError($exception)) {
+                        if ($exception instanceof QueryException && $exception->isConnectionError()) {
                             throw $exception;
                         }
                         $this->dispatchError($exception, $task);
@@ -92,7 +91,7 @@ final class Worker
                 }
             } catch (Throwable $exception) {
                 // Connection errors are fatal - stop the worker
-                if ($this->isConnectionError($exception)) {
+                if ($exception instanceof QueryException && $exception->isConnectionError()) {
                     $this->dispatchError($exception);
                     throw $exception;
                 }
@@ -129,34 +128,5 @@ final class Worker
         if ($microseconds > 0) {
             usleep($microseconds);
         }
-    }
-
-    /**
-     * Check if an exception indicates a database connection error.
-     */
-    private function isConnectionError(Throwable $exception): bool
-    {
-        if (!$exception instanceof PDOException) {
-            return false;
-        }
-
-        // SQLSTATE HY000 with driver code 7 = "no connection to the server"
-        // SQLSTATE 08xxx = connection exceptions in SQL standard
-        $sqlState = $exception->getCode();
-
-        if (is_string($sqlState) && str_starts_with($sqlState, '08')) {
-            return true;
-        }
-
-        // Check for common connection error messages
-        $message = strtolower($exception->getMessage());
-
-        return (
-            str_contains($message, 'no connection')
-            || str_contains($message, 'connection refused')
-            || str_contains($message, 'connection timed out')
-            || str_contains($message, 'server has gone away')
-            || str_contains($message, 'lost connection')
-        );
     }
 }
