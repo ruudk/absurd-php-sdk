@@ -1,9 +1,11 @@
-FROM alpine:3.19
+FROM debian:trixie-slim
 
-ARG ABSURD_VERSION=0.0.7
+ARG ABSURD_VERSION=0.3.0
 ARG TARGETARCH
 
-RUN apk add --no-cache curl ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # Map Docker's TARGETARCH to habitat binary names
 RUN case "${TARGETARCH}" in \
