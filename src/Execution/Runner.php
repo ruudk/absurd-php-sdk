@@ -117,7 +117,7 @@ final readonly class Runner
         }
 
         $stmt = $this->context->pdo->prepare(
-            'SELECT should_suspend, payload FROM absurd.await_event(:queue, :task_id, :run_id, :checkpoint_name, :event_name, :timeout)',
+            'SELECT should_suspend::int, payload FROM absurd.await_event(:queue, :task_id, :run_id, :checkpoint_name, :event_name, :timeout)',
         );
 
         if ($stmt === false) {
@@ -139,7 +139,7 @@ final readonly class Runner
             throw new TaskExecutionError('Failed to await event');
         }
 
-        if ($row['should_suspend'] === 'f') {
+        if (!$row['should_suspend']) {
             /** @var mixed $payload Event payload is dynamically typed */
             $payload = $this->context->serializer->decode($row['payload'] ?? '');
             $this->checkpoints->persist($checkpoint->name, $payload);
