@@ -267,7 +267,7 @@ final class AbsurdTest extends IntegrationTestCase
         $retryResult = $this->absurd->retryTask($spawnResult->taskId, new RetryOptions(spawnNewTask: true));
 
         self::assertNotSame($retryResult->taskId, $spawnResult->taskId, 'retried task must nwo have a new task-id');
-        self::assertTrue($retryResult->created, 'retried task must not be recreated');
+        self::assertTrue($retryResult->created, 'retried task must be recreated');
         self::assertSame(1, $retryResult->attempt, 'new task must now have initial attempt number');
     }
 
