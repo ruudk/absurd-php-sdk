@@ -5,15 +5,15 @@ namespace Ruudk\Absurd\Serialization;
 use JsonException;
 use Ruudk\Absurd\Exception\SerializationException;
 use Symfony\Component\Serializer\Exception\ExceptionInterface as SerializerException;
-use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Component\Serializer\SerializerInterface as SymfonySerializerInterface;
 
 /**
  * Symfony Serializer implementation with support for typed deserialization.
  */
-final readonly class SymfonySerializer implements Serializer
+final readonly class SymfonySerializer implements SerializerInterface
 {
     public function __construct(
-        private SerializerInterface $serializer,
+        private SymfonySerializerInterface $serializer,
     ) {}
 
     /**

@@ -4,7 +4,7 @@ namespace Ruudk\Absurd\Task;
 
 use Ruudk\Absurd\Connection\Connection;
 use Ruudk\Absurd\Exception\QueryException;
-use Ruudk\Absurd\Serialization\Serializer;
+use Ruudk\Absurd\Serialization\SerializerInterface;
 
 /**
  * Handles claiming tasks from the queue.
@@ -16,7 +16,7 @@ final readonly class Claimer
     public function __construct(
         private Connection $connection,
         private string $queueName,
-        private Serializer $serializer,
+        private SerializerInterface $serializer,
     ) {}
 
     /**

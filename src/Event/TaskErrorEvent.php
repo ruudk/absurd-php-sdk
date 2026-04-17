@@ -3,7 +3,6 @@
 namespace Ruudk\Absurd\Event;
 
 use Ruudk\Absurd\Task\ClaimedTask;
-use Symfony\Contracts\EventDispatcher\Event;
 use Throwable;
 
 /**
@@ -11,7 +10,7 @@ use Throwable;
  *
  * Listeners can use this event for logging, monitoring, or custom error handling.
  */
-final class TaskErrorEvent extends Event
+final class TaskErrorEvent
 {
     public function __construct(
         public readonly Throwable $exception,

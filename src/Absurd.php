@@ -15,7 +15,8 @@ use Ruudk\Absurd\Exception\QueryException;
 use Ruudk\Absurd\Exception\TaskExecutionError;
 use Ruudk\Absurd\Execution\Context as ExecutionContext;
 use Ruudk\Absurd\Execution\Executor;
-use Ruudk\Absurd\Serialization\Serializer;
+use Ruudk\Absurd\Serialization\JsonSerializer;
+use Ruudk\Absurd\Serialization\SerializerInterface;
 use Ruudk\Absurd\Task\ClaimedTask;
 use Ruudk\Absurd\Task\Claimer;
 use Ruudk\Absurd\Task\ClaimOptions;
@@ -39,7 +40,7 @@ final class Absurd
 
     public function __construct(
         private readonly Connection $connection,
-        private readonly Serializer $serializer,
+        private readonly SerializerInterface $serializer = new JsonSerializer(),
         private readonly string $defaultQueueName = 'default',
         private readonly int $defaultMaxAttempts = 5,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,

@@ -3,14 +3,13 @@
 namespace Ruudk\Absurd\Event;
 
 use Ruudk\Absurd\Task\RetryOptions;
-use Symfony\Contracts\EventDispatcher\Event;
 
 /**
  * Dispatched before a task is retried.
  *
  * Listeners can modify the retry options
  */
-final class BeforeRetryEvent extends Event
+final class BeforeRetryEvent
 {
     public function __construct(
         public readonly string $taskId,

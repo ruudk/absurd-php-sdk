@@ -5,7 +5,7 @@ namespace Ruudk\Absurd\Serialization;
 /**
  * Interface for serializing and deserializing data for storage.
  */
-interface Serializer
+interface SerializerInterface
 {
     /**
      * Encode a value for storage.

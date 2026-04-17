@@ -3,7 +3,7 @@
 namespace Ruudk\Absurd\Execution;
 
 use Ruudk\Absurd\Connection\Connection;
-use Ruudk\Absurd\Serialization\Serializer;
+use Ruudk\Absurd\Serialization\SerializerInterface;
 
 /**
  * Context for task execution, containing all dependencies needed by Runner.
@@ -16,6 +16,6 @@ final readonly class Context
         public Connection $connection,
         public string $queueName,
         public int $claimTimeout,
-        public Serializer $serializer,
+        public SerializerInterface $serializer,
     ) {}
 }

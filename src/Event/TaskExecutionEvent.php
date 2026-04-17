@@ -4,7 +4,6 @@ namespace Ruudk\Absurd\Event;
 
 use Closure;
 use Ruudk\Absurd\Task\Context;
-use Symfony\Contracts\EventDispatcher\Event;
 
 /**
  * Dispatched when a task is about to be executed.
@@ -25,7 +24,7 @@ use Symfony\Contracts\EventDispatcher\Event;
  *         });
  *     });
  */
-final class TaskExecutionEvent extends Event
+final class TaskExecutionEvent
 {
     /** @var (Closure(Closure(): mixed): mixed)|null */
     private ?Closure $wrapper = null;
