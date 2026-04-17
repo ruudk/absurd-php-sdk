@@ -8,6 +8,7 @@ use Ruudk\Absurd\Exception\SuspendTask;
 use Ruudk\Absurd\Exception\TaskExecutionError;
 use Ruudk\Absurd\Exception\TimeoutError;
 use Ruudk\Absurd\Task\ClaimedTask;
+use Ruudk\Absurd\Worker\LeaseMonitor;
 use Throwable;
 
 /**
@@ -18,6 +19,7 @@ use Throwable;
 final readonly class Runner
 {
     private function __construct(
+        private LeaseMonitor $monitor,
         private Context $context,
         private string $taskId,
         private ClaimedTask $task,
@@ -27,11 +29,11 @@ final readonly class Runner
     /**
      * Create a Runner by loading checkpoints from the database.
      */
-    public static function create(Context $context, string $taskId, ClaimedTask $task): self
+    public static function create(LeaseMonitor $monitor, Context $context, string $taskId, ClaimedTask $task): self
     {
         $checkpoints = new CheckpointStore($context, $task);
         $checkpoints->load();
-        return new self($context, $taskId, $task, $checkpoints);
+        return new self($monitor, $context, $taskId, $task, $checkpoints);
     }
 
     /**
@@ -165,6 +167,8 @@ final readonly class Runner
     public function executeHeartbeat(?int $seconds = null): void
     {
         $timeout = $seconds ?? $this->context->claimTimeout;
+
+        $this->monitor->reset($timeout);
 
         $this->executeQuery('SELECT absurd.extend_claim(:queue, :run_id, :seconds)', [
             'queue' => $this->context->queueName,
