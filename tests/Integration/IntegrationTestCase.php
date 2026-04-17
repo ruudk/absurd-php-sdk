@@ -5,6 +5,7 @@ namespace Ruudk\Absurd\Integration;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\Connection\PdoConnection;
 use Ruudk\Absurd\Serialization\SymfonySerializer;
 use Ruudk\Absurd\Task\ClaimOptions;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -39,7 +40,7 @@ abstract class IntegrationTestCase extends TestCase
         }
 
         $this->queueName = 'test-' . bin2hex(random_bytes(4));
-        $this->absurd = new Absurd(self::$pdo, $this->createSerializer(), $this->queueName);
+        $this->absurd = new Absurd(new PdoConnection(self::$pdo), $this->createSerializer(), $this->queueName);
         $this->absurd->createQueue();
     }
 

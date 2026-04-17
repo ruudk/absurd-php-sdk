@@ -49,8 +49,10 @@ final readonly class FiberExecutor
 
             /** @var mixed $result Command execution returns dynamic types */
             try {
+                /** @mago-ignore analysis:mixed-assignment */
                 $result = $command->execute($this->runner);
             } catch (TimeoutError $e) {
+                /** @mago-ignore analysis:mixed-assignment */
                 $command = $fiber->throw($e);
                 continue;
             }

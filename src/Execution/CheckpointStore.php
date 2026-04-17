@@ -2,7 +2,7 @@
 
 namespace Ruudk\Absurd\Execution;
 
-use PDO;
+use Ruudk\Absurd\Exception\QueryException;
 use Ruudk\Absurd\Task\ClaimedTask;
 
 /**
@@ -28,28 +28,20 @@ final class CheckpointStore
      */
     public function load(): void
     {
-        $stmt = $this->context->pdo->prepare(
-            'SELECT checkpoint_name, state FROM absurd.get_task_checkpoint_states(:queue, :task_id, :run_id)',
-        );
+        try {
+            $rows = $this->context->connection->fetchAll('SELECT checkpoint_name, state FROM absurd.get_task_checkpoint_states(:queue, :task_id, :run_id)', [
+                'queue' => $this->context->queueName,
+                'task_id' => $this->task->taskId,
+                'run_id' => $this->task->runId,
+            ]);
 
-        if ($stmt === false) {
+            foreach ($rows as $row) {
+                $this->cache[(string) $row['checkpoint_name']] = $this->context->serializer->decode(
+                    (string) $row['state'],
+                );
+            }
+        } catch (QueryException) {
             return;
-        }
-
-        $stmt->execute([
-            'queue' => $this->context->queueName,
-            'task_id' => $this->task->taskId,
-            'run_id' => $this->task->runId,
-        ]);
-
-        /** @var list<array{checkpoint_name: string, state: string}>|false $rows */
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if ($rows === false) {
-            return;
-        }
-
-        foreach ($rows as $row) {
-            $this->cache[$row['checkpoint_name']] = $this->context->serializer->decode($row['state']);
         }
     }
 
@@ -101,19 +93,15 @@ final class CheckpointStore
      */
     public function persist(string $resolvedName, mixed $value): void
     {
-        $stmt = $this->context->pdo->prepare(
-            'SELECT absurd.set_task_checkpoint_state(:queue, :task_id, :checkpoint_name, :state, :run_id, :claim_timeout)',
-        );
-        if ($stmt !== false) {
-            $stmt->execute([
-                'queue' => $this->context->queueName,
-                'task_id' => $this->task->taskId,
-                'checkpoint_name' => $resolvedName,
-                'state' => $this->context->serializer->encode($value),
-                'run_id' => $this->task->runId,
-                'claim_timeout' => $this->context->claimTimeout,
-            ]);
-        }
+        $this->context->connection->execute('SELECT absurd.set_task_checkpoint_state(:queue, :task_id, :checkpoint_name, :state, :run_id, :claim_timeout)', [
+            'queue' => $this->context->queueName,
+            'task_id' => $this->task->taskId,
+            'checkpoint_name' => $resolvedName,
+            'state' => $this->context->serializer->encode($value),
+            'run_id' => $this->task->runId,
+            'claim_timeout' => $this->context->claimTimeout,
+        ]);
+
         $this->cache[$resolvedName] = $value;
     }
 

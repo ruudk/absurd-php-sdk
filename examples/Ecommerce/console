@@ -34,6 +34,7 @@ use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use Monolog\Processor\PsrLogMessageProcessor;
 use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\Connection\PdoConnection;
 use Ruudk\Absurd\Examples\ColorizedTaskProcessor;
 use Ruudk\Absurd\Examples\Ecommerce\ConsumeCommand;
 use Ruudk\Absurd\Examples\Ecommerce\ProduceCommand;
@@ -74,7 +75,7 @@ $eventDispatcher = new EventDispatcher();
 $tracingSubscriber = new TracingSubscriber();
 $eventDispatcher->addSubscriber($tracingSubscriber);
 
-$absurd = new Absurd($pdo, $serializer, 'orders', eventDispatcher: $eventDispatcher);
+$absurd = new Absurd(new PdoConnection($pdo), $serializer, 'orders', eventDispatcher: $eventDispatcher);
 
 $app = new Application('E-commerce Order Fulfillment', '1.0.0');
 $app->addCommands([

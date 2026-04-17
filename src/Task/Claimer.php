@@ -2,7 +2,8 @@
 
 namespace Ruudk\Absurd\Task;
 
-use PDO;
+use Ruudk\Absurd\Connection\Connection;
+use Ruudk\Absurd\Exception\QueryException;
 use Ruudk\Absurd\Serialization\Serializer;
 
 /**
@@ -13,7 +14,7 @@ use Ruudk\Absurd\Serialization\Serializer;
 final readonly class Claimer
 {
     public function __construct(
-        private PDO $pdo,
+        private Connection $connection,
         private string $queueName,
         private Serializer $serializer,
     ) {}
@@ -25,26 +26,23 @@ final readonly class Claimer
      */
     public function claim(string $workerId, int $claimTimeout, int $batchSize): array
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT run_id, task_id, attempt, task_name, params, retry_strategy, max_attempts,
+        try {
+            $rows = $this->connection->fetchAll(
+                'SELECT run_id, task_id, attempt, task_name, params, retry_strategy, max_attempts,
                     headers, wake_event, event_payload
              FROM absurd.claim_task(:queue, :worker_id, :claim_timeout, :batch_size)',
-        );
-
-        if ($stmt === false) {
+                [
+                    'queue' => $this->queueName,
+                    'worker_id' => $workerId,
+                    'claim_timeout' => $claimTimeout,
+                    'batch_size' => $batchSize,
+                ],
+            );
+        } catch (QueryException) {
             return [];
         }
 
-        $stmt->execute([
-            'queue' => $this->queueName,
-            'worker_id' => $workerId,
-            'claim_timeout' => $claimTimeout,
-            'batch_size' => $batchSize,
-        ]);
-
         $tasks = [];
-        /** @var list<array<string, mixed>> $rows */
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($rows as $row) {
             /** @var array<string, mixed>|null $headers */
