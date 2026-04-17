@@ -43,13 +43,13 @@ final readonly class Executor
             throw new TaskExecutionError('Misconfigured task (queue mismatch)');
         }
 
-        $runner = Runner::create($this->context, $task->taskId, $task);
-        $fiberExecutor = new FiberExecutor(
-            $runner,
-            new LeaseMonitor($task, $claimTimeout, $fatalOnLeaseTimeout, $this->logger),
-        );
+        $monitor = new LeaseMonitor($task, $claimTimeout, $fatalOnLeaseTimeout, $this->logger);
+        $runner = Runner::create($monitor, $this->context, $task->taskId, $task);
+        $fiberExecutor = new FiberExecutor($runner, $monitor);
 
         try {
+            $monitor->arm();
+
             /** @var mixed $params Task parameters are dynamically typed based on handler signature */
             $params = $this->context->serializer->decode($task->rawParams, $registration->payloadType);
             $ctx = new TaskContext($task->taskId, $task->runId, $task->attempt, $task->headers ?? [], $this->logger);
@@ -75,6 +75,8 @@ final readonly class Executor
             return;
         } catch (Throwable $exception) {
             $runner->fail($exception);
+        } finally {
+            $monitor->disarm();
         }
     }
 }

@@ -18,12 +18,40 @@ final class LeaseMonitor
 
     public function __construct(
         private readonly ClaimedTask $task,
-        private readonly int $claimTimeout,
-        bool $fatalOnLeaseTimeout,
+        private int $claimTimeout,
+        private readonly bool $fatalOnLeaseTimeout,
         private readonly LoggerInterface $logger,
     ) {
-        $this->warnTime = $claimTimeout > 0 ? microtime(true) + $claimTimeout : null;
-        $this->fatalTime = $claimTimeout > 0 && $fatalOnLeaseTimeout ? microtime(true) + ($claimTimeout * 2) : null;
+        $this->reset();
+    }
+
+    public function arm(): void
+    {
+        $this->reset();
+
+        if (extension_loaded('pcntl') && $this->claimTimeout > 0) {
+            pcntl_async_signals(true);
+            pcntl_signal(SIGALRM, $this->check(...));
+            pcntl_alarm($this->claimTimeout);
+        }
+    }
+
+    public function disarm(): void
+    {
+        if (extension_loaded('pcntl')) {
+            pcntl_alarm(0);
+            pcntl_signal(SIGALRM, SIG_IGN);
+        }
+    }
+
+    public function reset(?int $seconds = null): void
+    {
+        if ($seconds) {
+            $this->claimTimeout = $seconds;
+        }
+        $this->warned = false;
+        $this->warnTime = $this->claimTimeout > 0 ? microtime(true) + $this->claimTimeout : null;
+        $this->fatalTime = $this->claimTimeout > 0 && $this->fatalOnLeaseTimeout ? microtime(true) + ($this->claimTimeout * 2) : null;
     }
 
     /**
@@ -38,6 +66,10 @@ final class LeaseMonitor
                 'timeout' => $this->claimTimeout,
             ]);
             $this->warned = true;
+
+            if ($this->fatalOnLeaseTimeout && extension_loaded('pcntl')) {
+                pcntl_alarm($this->claimTimeout);
+            }
         }
 
         if ($this->fatalTime !== null && microtime(true) > $this->fatalTime) {
