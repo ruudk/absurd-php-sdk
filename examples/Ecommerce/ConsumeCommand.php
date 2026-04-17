@@ -3,7 +3,7 @@
 namespace Ruudk\Absurd\Examples\Ecommerce;
 
 use Psr\Log\LoggerInterface;
-use Ruudk\Absurd\AbsurdInterface;
+use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Event\TaskErrorEvent;
 use Ruudk\Absurd\Worker\WorkerOptions;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -24,7 +24,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 final class ConsumeCommand extends Command
 {
     public function __construct(
-        private readonly AbsurdInterface $absurd,
+        private readonly Absurd $absurd,
         private readonly LoggerInterface $logger,
         private readonly EventDispatcher $eventDispatcher,
     ) {

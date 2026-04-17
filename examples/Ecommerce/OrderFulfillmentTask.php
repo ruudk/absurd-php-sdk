@@ -2,7 +2,7 @@
 
 namespace Ruudk\Absurd\Examples\Ecommerce;
 
-use Ruudk\Absurd\AbsurdInterface;
+use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Exception\TimeoutError;
 use Ruudk\Absurd\Execution\AwaitEventOptions;
 use Ruudk\Absurd\Task\Context as TaskContext;
@@ -29,7 +29,7 @@ use Ruudk\Absurd\Task\SpawnOptions;
 final readonly class OrderFulfillmentTask
 {
     public function __construct(
-        private AbsurdInterface $absurd,
+        private Absurd $absurd,
     ) {}
 
     /**

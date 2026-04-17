@@ -3,7 +3,7 @@
 namespace Ruudk\Absurd\Worker;
 
 use Psr\EventDispatcher\EventDispatcherInterface;
-use Ruudk\Absurd\AbsurdInterface;
+use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Event\TaskErrorEvent;
 use Ruudk\Absurd\Exception\QueryException;
 use Ruudk\Absurd\Task\ClaimedTask;
@@ -21,7 +21,7 @@ final class Worker
      * @internal
      */
     public function __construct(
-        private readonly AbsurdInterface $absurd,
+        private readonly Absurd $absurd,
         private readonly WorkerOptions $options,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
     ) {}

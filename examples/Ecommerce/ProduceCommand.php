@@ -3,7 +3,7 @@
 namespace Ruudk\Absurd\Examples\Ecommerce;
 
 use DateTimeImmutable;
-use Ruudk\Absurd\AbsurdInterface;
+use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Task\CancellationPolicy;
 use Ruudk\Absurd\Task\RetryStrategy;
 use Ruudk\Absurd\Task\SpawnOptions;
@@ -33,7 +33,7 @@ final class ProduceCommand extends Command
     private const HABITAT_URL = 'http://localhost:7890';
 
     public function __construct(
-        private readonly AbsurdInterface $absurd,
+        private readonly Absurd $absurd,
         private readonly TracingSubscriber $tracingSubscriber,
     ) {
         parent::__construct();
