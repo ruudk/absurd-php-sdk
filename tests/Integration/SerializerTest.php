@@ -4,6 +4,7 @@ namespace Ruudk\Absurd\Integration;
 
 use PHPUnit\Framework\Attributes\Test;
 use Ruudk\Absurd\Absurd;
+use Ruudk\Absurd\Connection\PdoConnection;
 use Ruudk\Absurd\Serialization\JsonSerializer;
 use Ruudk\Absurd\Task\Context;
 use Ruudk\Absurd\Task\SpawnOptions;
@@ -15,7 +16,7 @@ final class SerializerTest extends IntegrationTestCase
     {
         $received = null;
 
-        $this->absurd = new Absurd(self::$pdo, new JsonSerializer(), $this->queueName);
+        $this->absurd = new Absurd(new PdoConnection(self::$pdo), new JsonSerializer(), $this->queueName);
 
         $this->absurd->registerTask('array-task', static function (array $params, Context $ctx) use (&$received) {
             $received = $params;
@@ -30,7 +31,7 @@ final class SerializerTest extends IntegrationTestCase
     #[Test]
     public function jsonSerializerFailsWithTypedPayload(): void
     {
-        $this->absurd = new Absurd(self::$pdo, new JsonSerializer(), $this->queueName);
+        $this->absurd = new Absurd(new PdoConnection(self::$pdo), new JsonSerializer(), $this->queueName);
 
         $this->absurd->registerTask('typed-task-fail', static function (TaskPayload $params, Context $ctx) {});
 
