@@ -51,7 +51,9 @@ final class LeaseMonitor
         }
         $this->warned = false;
         $this->warnTime = $this->claimTimeout > 0 ? microtime(true) + $this->claimTimeout : null;
-        $this->fatalTime = $this->claimTimeout > 0 && $this->fatalOnLeaseTimeout ? microtime(true) + ($this->claimTimeout * 2) : null;
+        $this->fatalTime = $this->claimTimeout > 0 && $this->fatalOnLeaseTimeout
+            ? microtime(true) + ($this->claimTimeout * 2)
+            : null;
     }
 
     /**

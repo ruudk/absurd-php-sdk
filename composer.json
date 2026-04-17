@@ -31,6 +31,7 @@
         "symfony/serializer": "^7.4 || ^8.0"
     },
     "suggest": {
+        "ext-pcntl": "enables signal-based fatal timeout via SIGALRM in LeaseMonitor",
         "symfony/serializer": "for typed task payloads"
     },
     "autoload": {
