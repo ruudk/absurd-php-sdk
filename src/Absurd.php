@@ -33,7 +33,7 @@ use Ruudk\Absurd\Worker\WorkerOptions;
 
 final class Absurd
 {
-    private string $queueName;
+    public readonly string $queueName;
 
     /** @var array<string, Registration> */
     private array $registry = [];

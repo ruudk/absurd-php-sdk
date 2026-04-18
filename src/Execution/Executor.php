@@ -5,7 +5,10 @@ namespace Ruudk\Absurd\Execution;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Ruudk\Absurd\Event\TaskCompletedEvent;
 use Ruudk\Absurd\Event\TaskExecutionEvent;
+use Ruudk\Absurd\Event\TaskFailedEvent;
+use Ruudk\Absurd\Event\TaskStartedEvent;
 use Ruudk\Absurd\Exception\SuspendTask;
 use Ruudk\Absurd\Exception\TaskExecutionError;
 use Ruudk\Absurd\Task\ClaimedTask;
@@ -47,6 +50,8 @@ final readonly class Executor
         $runner = Runner::create($monitor, $this->context, $task->taskId, $task);
         $fiberExecutor = new FiberExecutor($runner, $monitor);
 
+        $this->eventDispatcher?->dispatch(new TaskStartedEvent($task, $this->context->queueName));
+
         try {
             $monitor->arm();
 
@@ -71,10 +76,14 @@ final readonly class Executor
             $result = $wrapper !== null ? $wrapper($execute) : $execute();
 
             $runner->complete($result);
+
+            $this->eventDispatcher?->dispatch(new TaskCompletedEvent($task, $this->context->queueName, $result, false));
         } catch (SuspendTask) {
+            $this->eventDispatcher?->dispatch(new TaskCompletedEvent($task, $this->context->queueName, null, true));
             return;
         } catch (Throwable $exception) {
             $runner->fail($exception);
+            $this->eventDispatcher?->dispatch(new TaskFailedEvent($task, $this->context->queueName, $exception));
         } finally {
             $monitor->disarm();
         }

@@ -5,6 +5,8 @@ namespace Ruudk\Absurd\Worker;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Event\TaskErrorEvent;
+use Ruudk\Absurd\Event\WorkerStartedEvent;
+use Ruudk\Absurd\Event\WorkerStoppedEvent;
 use Ruudk\Absurd\Exception\QueryException;
 use Ruudk\Absurd\Task\ClaimedTask;
 use Ruudk\Absurd\Task\ClaimOptions;
@@ -34,6 +36,7 @@ final class Worker
         $this->running = true;
         $lastPoll = 0.0;
 
+        $this->eventDispatcher?->dispatch(new WorkerStartedEvent($this->absurd->queueName, $this->options->workerId));
         $this->options->logger->info('Worker started', ['workerId' => $this->options->workerId]);
 
         while ($this->running) {
@@ -100,6 +103,7 @@ final class Worker
             }
         }
 
+        $this->eventDispatcher?->dispatch(new WorkerStoppedEvent($this->absurd->queueName, $this->options->workerId));
         $this->options->logger->info('Worker stopped');
     }
 
