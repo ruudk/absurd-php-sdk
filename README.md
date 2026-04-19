@@ -2,19 +2,29 @@
 
 PHP SDK for [Absurd](https://github.com/earendil-works/absurd): a PostgreSQL-based durable task execution system.
 
-Absurd is the simplest durable execution workflow system you can think of. It's entirely based on Postgres and nothing else. It's almost as easy to use as a queue, but it handles scheduling and retries, and it does all of that without needing any other services to run in addition to Postgres.
+Absurd is the simplest durable execution workflow system you can think of. It's entirely based on Postgres and nothing
+else. It's almost as easy to use as a queue, but it handles scheduling and retries, and it does all of that without
+needing any other services to run in addition to Postgres.
 
-**Note:** _This PHP SDK is still in its early stages. Absurd itself [has been running in production](https://lucumr.pocoo.org/2026/4/4/absurd-in-production/) at Earendil since its initial release._
+**Note:** _This PHP SDK is still in its early stages. Absurd
+itself [has been running in production](https://lucumr.pocoo.org/2026/4/4/absurd-in-production/) at Earendil since its
+initial release._
 
 ## What is Durable Execution?
 
-Durable execution (or durable workflows) is a way to run long-lived, reliable functions that can survive crashes, restarts, and network failures without losing state or duplicating work. Instead of running your logic in memory, a durable execution system decomposes a task into smaller pieces (step functions) and records every step and decision.
+Durable execution (or durable workflows) is a way to run long-lived, reliable functions that can survive crashes,
+restarts, and network failures without losing state or duplicating work. Instead of running your logic in memory, a
+durable execution system decomposes a task into smaller pieces (step functions) and records every step and decision.
 
 ## How It Works
 
-This SDK uses [PHP Fibers](https://www.php.net/manual/en/language.fibers.php) to provide a clean, synchronous-looking API for durable workflows. When you call methods like `$ctx->step()`, `$ctx->awaitEvent()`, or `$ctx->sleepFor()`, the Fiber suspends execution, allowing the SDK to checkpoint progress to the database. When the task resumes (after a crash, timeout, or event), execution continues from exactly where it left off.
+This SDK uses [PHP Fibers](https://www.php.net/manual/en/language.fibers.php) to provide a clean, synchronous-looking
+API for durable workflows. When you call methods like `$ctx->step()`, `$ctx->awaitEvent()`, or `$ctx->sleepFor()`, the
+Fiber suspends execution, allowing the SDK to checkpoint progress to the database. When the task resumes (after a crash,
+timeout, or event), execution continues from exactly where it left off.
 
-This means you can write workflow code that looks like normal sequential PHP code, while the SDK handles all the complexity of persistence, retries, and resumption behind the scenes.
+This means you can write workflow code that looks like normal sequential PHP code, while the SDK handles all the
+complexity of persistence, retries, and resumption behind the scenes.
 
 ## Installation
 
@@ -63,7 +73,8 @@ $worker->start();
 
 ## Client Configuration
 
-The `Absurd` constructor accepts a `Connection` instance instead of a raw PDO object. Wrap your PDO with `PdoConnection` (or implement your own adapter, e.g. for Doctrine DBAL):
+The `Absurd` constructor accepts a `Connection` instance instead of a raw PDO object. Wrap your PDO with
+`PdoConnection` (or implement your own adapter, e.g. for Doctrine DBAL):
 
 ```php
 use Ruudk\Absurd\Absurd;
@@ -81,7 +92,8 @@ $absurd = new Absurd(
 );
 ```
 
-The serializer defaults to `JsonSerializer` (no extra dependencies). Pass `SymfonySerializer` if you need typed object deserialization:
+The serializer defaults to `JsonSerializer` (no extra dependencies). Pass `SymfonySerializer` if you need typed object
+deserialization:
 
 ```php
 use Ruudk\Absurd\Serialization\SymfonySerializer;
@@ -380,7 +392,8 @@ $worker->start();
 
 ### Worker Concurrency Model
 
-PHP workers process tasks **sequentially** within a single process. The `batchSize` option controls how many tasks are claimed from the database in each poll, but they are still executed one at a time. This design ensures:
+PHP workers process tasks **sequentially** within a single process. The `batchSize` option controls how many tasks are
+claimed from the database in each poll, but they are still executed one at a time. This design ensures:
 
 - Predictable resource usage per worker
 - Simple error isolation (one task failure doesn't affect others)
@@ -397,9 +410,9 @@ Or use a process manager like Supervisor:
 
 ```ini
 [program:absurd-worker]
-command=php /path/to/worker.php
-numprocs=4
-process_name=%(program_name)s_%(process_num)02d
+command = php /path/to/worker.php
+numprocs = 4
+process_name = %(program_name)s_%(process_num)02d
 ```
 
 ## Events
@@ -408,24 +421,24 @@ Use a PSR-14 `EventDispatcherInterface` for lifecycle hooks and error handling.
 
 ### Available Events
 
-| Event | Dispatched when |
-|-------|----------------|
-| `WorkerStartedEvent` | Worker begins polling |
-| `WorkerStoppedEvent` | Worker stops |
-| `TaskStartedEvent` | A task is picked up for execution |
-| `TaskCompletedEvent` | A task finishes (includes suspended tasks) |
-| `TaskFailedEvent` | A task throws an unhandled exception |
-| `TaskErrorEvent` | Any error occurs (task or worker level) |
-| `BeforeSpawnEvent` | Before a task is spawned (options are mutable) |
-| `BeforeRetryEvent` | Before a task is retried (options are mutable) |
-| `TaskExecutionEvent` | Wraps task execution (for context propagation) |
+| Event                | Dispatched when                                        |
+|----------------------|--------------------------------------------------------|
+| `WorkerStartedEvent` | Worker begins polling                                  |
+| `WorkerStoppedEvent` | Worker stops                                           |
+| `WorkerRunningEvent` | After each poll cycle (idle or after batch completion) |
+| `TaskStartedEvent`   | A task is picked up for execution                      |
+| `TaskCompletedEvent` | A task finishes (includes suspended tasks)             |
+| `TaskFailedEvent`    | A task throws an unhandled exception                   |
+| `TaskErrorEvent`     | Any error occurs (task or worker level)                |
+| `BeforeSpawnEvent`   | Before a task is spawned (options are mutable)         |
+| `BeforeRetryEvent`   | Before a task is retried (options are mutable)         |
+| `TaskExecutionEvent` | Wraps task execution (for context propagation)         |
 
 ```php
 use Ruudk\Absurd\Event\BeforeSpawnEvent;
-use Ruudk\Absurd\Event\TaskCompletedEvent;
 use Ruudk\Absurd\Event\TaskErrorEvent;
 use Ruudk\Absurd\Event\TaskExecutionEvent;
-use Ruudk\Absurd\Event\WorkerStartedEvent;
+use Ruudk\Absurd\Event\WorkerRunningEvent;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
 $dispatcher = new EventDispatcher();
@@ -442,11 +455,19 @@ $dispatcher->addListener(TaskErrorEvent::class, function (TaskErrorEvent $event)
     ));
 });
 
-// Limit tasks handled per worker restart (like Symfony Messenger's MaxMessagesListener)
-$handled = 0;
-$dispatcher->addListener(TaskCompletedEvent::class, function (TaskCompletedEvent $event) use (&$handled, $worker) {
-    if (++$handled >= 100) {
-        $worker->stop();
+// Stop the worker after 100 tasks (like Symfony Messenger's MaxMessagesListener)
+$dispatcher->addListener(WorkerRunningEvent::class, function (WorkerRunningEvent $event) {
+    static $handled = 0;
+    $handled += $event->tasksHandled;
+    if ($handled >= 100) {
+        $event->worker->stop();
+    }
+});
+
+// React to idle cycles (no tasks found)
+$dispatcher->addListener(WorkerRunningEvent::class, function (WorkerRunningEvent $event) {
+    if ($event->isIdle()) {
+        // e.g. flush metrics, release resources between idle cycles
     }
 });
 
@@ -477,7 +498,8 @@ $absurd = new Absurd(new PdoConnection($pdo), eventDispatcher: $dispatcher);
 
 ## Typed Payloads
 
-With a serializer that supports type hydration (like the shipped `SymfonySerializer`), you can use typed objects as task parameters:
+With a serializer that supports type hydration (like the shipped `SymfonySerializer`), you can use typed objects as task
+parameters:
 
 ```php
 readonly class OrderPayload
@@ -561,6 +583,7 @@ make clean
 ```
 
 After running `make up`:
+
 - **PostgreSQL** is available at `localhost:54329`
 - **Habitat UI** (task dashboard) is available at http://localhost:7890
 
@@ -582,7 +605,9 @@ php examples/Ecommerce/console produce
 
 #### AI Agent with Tool Calling
 
-Demonstrates a durable AI agent workflow based on [this blog post](https://lucumr.pocoo.org/2025/11/3/absurd-workflows/). The agent loops through conversation steps, calling tools as needed, with each iteration durably checkpointed.
+Demonstrates a durable AI agent workflow based
+on [this blog post](https://lucumr.pocoo.org/2025/11/3/absurd-workflows/). The agent loops through conversation steps,
+calling tools as needed, with each iteration durably checkpointed.
 
 ```bash
 # Set your OpenAI API key
@@ -596,6 +621,7 @@ php examples/Agent/console ask
 ```
 
 Features:
+
 - Loop-based agent with automatic checkpointing per iteration
 - OpenAI integration with tool calling (get_weather, search_web, calculate)
 - Automatic recovery from crashes - resumes from last checkpoint
@@ -603,13 +629,13 @@ Features:
 
 ### Make Commands
 
-| Command | Description |
-|---------|-------------|
-| `make help` | Show available commands |
-| `make setup` | Download `absurdctl` binary |
-| `make up` | Start PostgreSQL, initialize Absurd, and run Habitat |
-| `make down` | Stop containers |
-| `make clean` | Remove binaries and database volumes |
+| Command      | Description                                          |
+|--------------|------------------------------------------------------|
+| `make help`  | Show available commands                              |
+| `make setup` | Download `absurdctl` binary                          |
+| `make up`    | Start PostgreSQL, initialize Absurd, and run Habitat |
+| `make down`  | Stop containers                                      |
+| `make clean` | Remove binaries and database volumes                 |
 
 ## Production Setup
 
@@ -625,39 +651,39 @@ absurdctl create-queue -d your-database-name default
 
 ### Absurd Class
 
-| Method | Description |
-|--------|-------------|
-| `registerTask(name, handler, options?)` | Register a task handler |
-| `spawn(taskName, params, options?, queue?)` | Spawn a new task |
-| `retryTask(taskId, options?, queue?)` | Retry a failed or cancelled task |
-| `getTask(taskId, queueName?)` | Get task info by ID |
-| `emitEvent(eventName, payload?, queueName?)` | Emit an event |
-| `cancelTask(taskId, queueName?)` | Cancel a running task |
-| `claimTasks(options?)` | Claim tasks for processing |
-| `startWorker(options?)` | Start a worker |
-| `createQueue(queueName?)` | Create a queue |
-| `dropQueue(queueName?)` | Drop a queue |
-| `listQueues()` | List all queues |
-| `executeTask(task, claimTimeout, ...)` | Execute a claimed task |
+| Method                                       | Description                      |
+|----------------------------------------------|----------------------------------|
+| `registerTask(name, handler, options?)`      | Register a task handler          |
+| `spawn(taskName, params, options?, queue?)`  | Spawn a new task                 |
+| `retryTask(taskId, options?, queue?)`        | Retry a failed or cancelled task |
+| `getTask(taskId, queueName?)`                | Get task info by ID              |
+| `emitEvent(eventName, payload?, queueName?)` | Emit an event                    |
+| `cancelTask(taskId, queueName?)`             | Cancel a running task            |
+| `claimTasks(options?)`                       | Claim tasks for processing       |
+| `startWorker(options?)`                      | Start a worker                   |
+| `createQueue(queueName?)`                    | Create a queue                   |
+| `dropQueue(queueName?)`                      | Drop a queue                     |
+| `listQueues()`                               | List all queues                  |
+| `executeTask(task, claimTimeout, ...)`       | Execute a claimed task           |
 
 ### TaskContext Class
 
-| Method | Description |
-|--------|-------------|
-| `step(name, value)` | Execute a checkpointed step |
-| `beginStep(name)` | Begin a split step, returns a `StepHandle` |
-| `completeStep(handle, value)` | Complete a split step, returns the value (cached on replay) |
-| `awaitEvent(eventName, options?)` | Wait for an event |
-| `sleepFor(stepName, duration)` | Sleep for a duration (seconds) |
-| `sleepUntil(stepName, wakeAt)` | Sleep until a specific time |
-| `emitEvent(eventName, payload?)` | Emit an event from within a task |
-| `heartbeat(seconds?)` | Extend the task lease |
+| Method                            | Description                                                 |
+|-----------------------------------|-------------------------------------------------------------|
+| `step(name, value)`               | Execute a checkpointed step                                 |
+| `beginStep(name)`                 | Begin a split step, returns a `StepHandle`                  |
+| `completeStep(handle, value)`     | Complete a split step, returns the value (cached on replay) |
+| `awaitEvent(eventName, options?)` | Wait for an event                                           |
+| `sleepFor(stepName, duration)`    | Sleep for a duration (seconds)                              |
+| `sleepUntil(stepName, wakeAt)`    | Sleep until a specific time                                 |
+| `emitEvent(eventName, payload?)`  | Emit an event from within a task                            |
+| `heartbeat(seconds?)`             | Extend the task lease                                       |
 
 ### SpawnResult Class
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `taskId` | string | Unique task identifier |
-| `runId` | string | Current run identifier |
-| `attempt` | int | Current attempt number |
-| `created` | bool | True if newly created, false if from idempotency cache |
+| Property  | Type   | Description                                            |
+|-----------|--------|--------------------------------------------------------|
+| `taskId`  | string | Unique task identifier                                 |
+| `runId`   | string | Current run identifier                                 |
+| `attempt` | int    | Current attempt number                                 |
+| `created` | bool   | True if newly created, false if from idempotency cache |
