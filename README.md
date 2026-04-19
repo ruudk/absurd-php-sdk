@@ -4,7 +4,7 @@ PHP SDK for [Absurd](https://github.com/earendil-works/absurd): a PostgreSQL-bas
 
 Absurd is the simplest durable execution workflow system you can think of. It's entirely based on Postgres and nothing else. It's almost as easy to use as a queue, but it handles scheduling and retries, and it does all of that without needing any other services to run in addition to Postgres.
 
-**Warning:** _This is an early experiment and should not be used in production._
+**Note:** _This PHP SDK is still young. Absurd itself [has been running in production](https://lucumr.pocoo.org/2026/4/4/absurd-in-production/) at Earendil since its initial release._
 
 ## What is Durable Execution?
 
@@ -28,7 +28,7 @@ composer require ruudk/absurd-php-sdk
 <?php
 
 use Ruudk\Absurd\Absurd;
-use Ruudk\Absurd\Serialization\SymfonySerializer;
+use Ruudk\Absurd\Connection\PdoConnection;
 use Ruudk\Absurd\Task\Context as TaskContext;
 
 // Create PDO connection
@@ -36,7 +36,7 @@ $pdo = new PDO('pgsql:host=localhost;dbname=absurd');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 // Create Absurd instance
-$absurd = new Absurd($pdo, new SymfonySerializer());
+$absurd = new Absurd(new PdoConnection($pdo));
 
 // Register a task handler
 $absurd->registerTask('order-fulfillment', function (array $params, TaskContext $ctx): array {
@@ -63,21 +63,56 @@ $worker->start();
 
 ## Client Configuration
 
+The `Absurd` constructor accepts a `Connection` instance instead of a raw PDO object. Wrap your PDO with `PdoConnection` (or implement your own adapter, e.g. for Doctrine DBAL):
+
 ```php
 use Ruudk\Absurd\Absurd;
-use Ruudk\Absurd\Serialization\SymfonySerializer;
+use Ruudk\Absurd\Connection\PdoConnection;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
 $pdo = new PDO('pgsql:host=localhost;dbname=absurd');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 $absurd = new Absurd(
-    pdo: $pdo,
-    serializer: new SymfonySerializer(),
+    connection: new PdoConnection($pdo),
     defaultQueueName: 'default',      // Default queue for tasks
     defaultMaxAttempts: 5,            // Default retry attempts
     eventDispatcher: new EventDispatcher(), // Optional: for hooks and error handling
 );
+```
+
+The serializer defaults to `JsonSerializer` (no extra dependencies). Pass `SymfonySerializer` if you need typed object deserialization:
+
+```php
+use Ruudk\Absurd\Serialization\SymfonySerializer;
+
+$absurd = new Absurd(
+    connection: new PdoConnection($pdo),
+    serializer: new SymfonySerializer(),
+);
+```
+
+### Custom Database Connection
+
+Implement `Connection\Connection` to integrate with any database layer (e.g. Doctrine DBAL):
+
+```php
+use Ruudk\Absurd\Connection\Connection;
+use Ruudk\Absurd\Exception\QueryException;
+
+final readonly class DbalConnection implements Connection
+{
+    public function __construct(private \Doctrine\DBAL\Connection $dbal) {}
+
+    public function fetchAll(string $sql, array $params = []): array
+    {
+        return $this->dbal->fetchAllAssociative($sql, $params);
+    }
+
+    // ... implement fetch(), execute(), scalar()
+}
+
+$absurd = new Absurd(connection: new DbalConnection($dbal));
 ```
 
 ## Queue Management
@@ -199,6 +234,14 @@ $absurd->registerTask('workflow', function (array $params, TaskContext $ctx): ar
     // Checkpoint a step - cached on retry
     $result = $ctx->step('step-name', fn() => expensiveOperation());
 
+    // Split step - when wrapping work in a closure isn't practical
+    $handle = $ctx->beginStep('split-step');
+    if (!$handle->done) {
+        $computed = expensiveOperation();
+    }
+    $result = $ctx->completeStep($handle, $computed ?? null);
+    // completeStep returns the cached state on replay, or the provided value on first run
+
     // Wait for an external event
     $eventPayload = $ctx->awaitEvent('payment-confirmed');
 
@@ -249,6 +292,29 @@ $absurd->cancelTask($taskId, 'orders');
 ```
 
 Running tasks will stop at their next checkpoint, heartbeat, or await event call.
+
+## Retrying Tasks
+
+Force a retry of a failed or cancelled task:
+
+```php
+use Ruudk\Absurd\Task\RetryOptions;
+
+// Retry with default options
+$result = $absurd->retryTask($taskId);
+
+// Retry with a higher attempt limit or as a brand new task
+$result = $absurd->retryTask(
+    $taskId,
+    new RetryOptions(
+        maxAttempts: 10,       // Override max attempts for this retry
+        spawnNewTask: true,    // Spawn as a new task instead of resuming the existing one
+    ),
+    queue: 'orders',           // Optional: override queue
+);
+```
+
+Use the `BeforeRetryEvent` to modify retry options from a listener (same pattern as `BeforeSpawnEvent`).
 
 ## Retrieving Task Info
 
@@ -336,15 +402,30 @@ numprocs=4
 process_name=%(program_name)s_%(process_num)02d
 ```
 
-## Error Handling with Events
+## Events
 
-Use the PSR-14 EventDispatcher for error handling and lifecycle hooks:
+Use a PSR-14 `EventDispatcherInterface` for lifecycle hooks and error handling.
+
+### Available Events
+
+| Event | Dispatched when |
+|-------|----------------|
+| `WorkerStartedEvent` | Worker begins polling |
+| `WorkerStoppedEvent` | Worker stops |
+| `TaskStartedEvent` | A task is picked up for execution |
+| `TaskCompletedEvent` | A task finishes (includes suspended tasks) |
+| `TaskFailedEvent` | A task throws an unhandled exception |
+| `TaskErrorEvent` | Any error occurs (task or worker level) |
+| `BeforeSpawnEvent` | Before a task is spawned (options are mutable) |
+| `BeforeRetryEvent` | Before a task is retried (options are mutable) |
+| `TaskExecutionEvent` | Wraps task execution (for context propagation) |
 
 ```php
-use Ruudk\Absurd\Absurd;
-use Ruudk\Absurd\Event\TaskErrorEvent;
 use Ruudk\Absurd\Event\BeforeSpawnEvent;
+use Ruudk\Absurd\Event\TaskCompletedEvent;
+use Ruudk\Absurd\Event\TaskErrorEvent;
 use Ruudk\Absurd\Event\TaskExecutionEvent;
+use Ruudk\Absurd\Event\WorkerStartedEvent;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
 $dispatcher = new EventDispatcher();
@@ -359,6 +440,14 @@ $dispatcher->addListener(TaskErrorEvent::class, function (TaskErrorEvent $event)
         $exception->getMessage(),
         $task?->taskId ?? 'unknown',
     ));
+});
+
+// Limit tasks handled per worker restart (like Symfony Messenger's MaxMessagesListener)
+$handled = 0;
+$dispatcher->addListener(TaskCompletedEvent::class, function (TaskCompletedEvent $event) use (&$handled, $worker) {
+    if (++$handled >= 100) {
+        $worker->stop();
+    }
 });
 
 // Modify spawn options before task creation (e.g., inject trace IDs)
@@ -383,12 +472,12 @@ $dispatcher->addListener(TaskExecutionEvent::class, function (TaskExecutionEvent
     });
 });
 
-$absurd = new Absurd($pdo, $serializer, eventDispatcher: $dispatcher);
+$absurd = new Absurd(new PdoConnection($pdo), eventDispatcher: $dispatcher);
 ```
 
 ## Typed Payloads
 
-You can use typed objects as task parameters:
+With a serializer that supports type hydration (like the shipped `SymfonySerializer`), you can use typed objects as task parameters:
 
 ```php
 readonly class OrderPayload
@@ -540,6 +629,7 @@ absurdctl create-queue -d your-database-name default
 |--------|-------------|
 | `registerTask(name, handler, options?)` | Register a task handler |
 | `spawn(taskName, params, options?, queue?)` | Spawn a new task |
+| `retryTask(taskId, options?, queue?)` | Retry a failed or cancelled task |
 | `getTask(taskId, queueName?)` | Get task info by ID |
 | `emitEvent(eventName, payload?, queueName?)` | Emit an event |
 | `cancelTask(taskId, queueName?)` | Cancel a running task |
@@ -555,6 +645,8 @@ absurdctl create-queue -d your-database-name default
 | Method | Description |
 |--------|-------------|
 | `step(name, value)` | Execute a checkpointed step |
+| `beginStep(name)` | Begin a split step, returns a `StepHandle` |
+| `completeStep(handle, value)` | Complete a split step, returns the value (cached on replay) |
 | `awaitEvent(eventName, options?)` | Wait for an event |
 | `sleepFor(stepName, duration)` | Sleep for a duration (seconds) |
 | `sleepUntil(stepName, wakeAt)` | Sleep until a specific time |
