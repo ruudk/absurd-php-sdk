@@ -9,9 +9,12 @@ use Ruudk\Absurd\Connection\PdoConnection;
 use Ruudk\Absurd\Event\TaskCompletedEvent;
 use Ruudk\Absurd\Event\TaskFailedEvent;
 use Ruudk\Absurd\Event\TaskStartedEvent;
+use Ruudk\Absurd\Event\WorkerRunningEvent;
 use Ruudk\Absurd\Event\WorkerStartedEvent;
 use Ruudk\Absurd\Event\WorkerStoppedEvent;
 use Ruudk\Absurd\Task\Context;
+use Ruudk\Absurd\Worker\Worker;
+use Ruudk\Absurd\Worker\WorkerOptions;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
 final class EventsTest extends IntegrationTestCase
@@ -86,6 +89,77 @@ final class EventsTest extends IntegrationTestCase
 
         static::assertCount(1, $recording->eventsOf(WorkerStartedEvent::class));
         static::assertCount(1, $recording->eventsOf(WorkerStoppedEvent::class));
+
+        $started = $recording->eventsOf(WorkerStartedEvent::class)[0];
+        static::assertInstanceOf(Worker::class, $started->worker);
+        static::assertSame($this->queueName, $started->queueName);
+
+        $stopped = $recording->eventsOf(WorkerStoppedEvent::class)[0];
+        static::assertSame($started->worker, $stopped->worker);
+    }
+
+    #[Test]
+    public function workerRunningEventIsDispatchedWhenIdle(): void
+    {
+        $dispatcher = new EventDispatcher();
+        $recording = new RecordingDispatcher();
+        $dispatcher->addListener(WorkerRunningEvent::class, [$recording, 'dispatch']);
+
+        $absurd = new Absurd(
+            new PdoConnection(self::$pdo),
+            $this->createSerializer(),
+            $this->queueName,
+            eventDispatcher: $dispatcher,
+        );
+        $worker = $absurd->startWorker();
+
+        $dispatcher->addListener(WorkerRunningEvent::class, $worker->stop(...));
+
+        $worker->start();
+
+        static::assertCount(1, $recording->eventsOf(WorkerRunningEvent::class));
+
+        $event = $recording->eventsOf(WorkerRunningEvent::class)[0];
+        static::assertSame(0, $event->tasksHandled);
+        static::assertTrue($event->isIdle());
+        static::assertSame($worker, $event->worker);
+    }
+
+    #[Test]
+    public function workerRunningEventReportsTasksHandled(): void
+    {
+        $dispatcher = new EventDispatcher();
+        $recording = new RecordingDispatcher();
+        $dispatcher->addListener(WorkerRunningEvent::class, [$recording, 'dispatch']);
+
+        $absurd = new Absurd(
+            new PdoConnection(self::$pdo),
+            $this->createSerializer(),
+            $this->queueName,
+            eventDispatcher: $dispatcher,
+        );
+        $absurd->registerTask('counting-task', static fn(array $p, Context $ctx) => 'done');
+        $absurd->spawn('counting-task', []);
+        $absurd->spawn('counting-task', []);
+
+        $worker = $absurd->startWorker(new WorkerOptions(batchSize: 2));
+
+        $dispatcher->addListener(WorkerRunningEvent::class, static function (WorkerRunningEvent $event) {
+            if (!$event->isIdle()) {
+                $event->worker->stop();
+            }
+        });
+
+        $worker->start();
+
+        $nonIdleEvents = array_values(array_filter(
+            $recording->eventsOf(WorkerRunningEvent::class),
+            static fn(WorkerRunningEvent $e) => !$e->isIdle(),
+        ));
+
+        static::assertCount(1, $nonIdleEvents);
+        static::assertSame(2, $nonIdleEvents[0]->tasksHandled);
+        static::assertFalse($nonIdleEvents[0]->isIdle());
     }
 
     #[Test]

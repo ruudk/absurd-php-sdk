@@ -5,6 +5,7 @@ namespace Ruudk\Absurd\Worker;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Ruudk\Absurd\Absurd;
 use Ruudk\Absurd\Event\TaskErrorEvent;
+use Ruudk\Absurd\Event\WorkerRunningEvent;
 use Ruudk\Absurd\Event\WorkerStartedEvent;
 use Ruudk\Absurd\Event\WorkerStoppedEvent;
 use Ruudk\Absurd\Exception\QueryException;
@@ -19,6 +20,8 @@ final class Worker
 {
     private bool $running = false;
 
+    public readonly string $id;
+
     /**
      * @internal
      */
@@ -26,7 +29,9 @@ final class Worker
         private readonly Absurd $absurd,
         private readonly WorkerOptions $options,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
-    ) {}
+    ) {
+        $this->id = $this->options->workerId;
+    }
 
     /**
      * Start the worker loop.
@@ -36,7 +41,7 @@ final class Worker
         $this->running = true;
         $lastPoll = 0.0;
 
-        $this->eventDispatcher?->dispatch(new WorkerStartedEvent($this->absurd->queueName, $this->options->workerId));
+        $this->eventDispatcher?->dispatch(new WorkerStartedEvent($this, $this->absurd->queueName));
         $this->options->logger->info('Worker started', ['workerId' => $this->options->workerId]);
 
         while ($this->running) {
@@ -59,6 +64,7 @@ final class Worker
                 ));
 
                 if ($tasks === []) {
+                    $this->eventDispatcher?->dispatch(new WorkerRunningEvent($this, $this->absurd->queueName, 0));
                     continue;
                 }
 
@@ -92,6 +98,10 @@ final class Worker
                         $this->dispatchError($exception, $task);
                     }
                 }
+
+                $this->eventDispatcher?->dispatch(
+                    new WorkerRunningEvent($this, $this->absurd->queueName, count($tasks)),
+                );
             } catch (Throwable $exception) {
                 // Connection errors are fatal - stop the worker
                 if ($exception instanceof QueryException && $exception->isConnectionError()) {
@@ -103,7 +113,7 @@ final class Worker
             }
         }
 
-        $this->eventDispatcher?->dispatch(new WorkerStoppedEvent($this->absurd->queueName, $this->options->workerId));
+        $this->eventDispatcher?->dispatch(new WorkerStoppedEvent($this, $this->absurd->queueName));
         $this->options->logger->info('Worker stopped');
     }
 
