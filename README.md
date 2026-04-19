@@ -4,7 +4,7 @@ PHP SDK for [Absurd](https://github.com/earendil-works/absurd): a PostgreSQL-bas
 
 Absurd is the simplest durable execution workflow system you can think of. It's entirely based on Postgres and nothing else. It's almost as easy to use as a queue, but it handles scheduling and retries, and it does all of that without needing any other services to run in addition to Postgres.
 
-**Note:** _This PHP SDK is still young. Absurd itself [has been running in production](https://lucumr.pocoo.org/2026/4/4/absurd-in-production/) at Earendil since its initial release._
+**Note:** _This PHP SDK is still in its early stages. Absurd itself [has been running in production](https://lucumr.pocoo.org/2026/4/4/absurd-in-production/) at Earendil since its initial release._
 
 ## What is Durable Execution?
 
