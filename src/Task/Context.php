@@ -9,11 +9,14 @@ use Psr\Log\NullLogger;
 use Ruudk\Absurd\Exception\TimeoutError;
 use Ruudk\Absurd\Execution\AwaitEventOptions;
 use Ruudk\Absurd\Execution\Command\AwaitEvent;
+use Ruudk\Absurd\Execution\Command\BeginStep;
 use Ruudk\Absurd\Execution\Command\Checkpoint;
+use Ruudk\Absurd\Execution\Command\CompleteStep;
 use Ruudk\Absurd\Execution\Command\EmitEvent;
 use Ruudk\Absurd\Execution\Command\Heartbeat;
 use Ruudk\Absurd\Execution\Command\SleepFor;
 use Ruudk\Absurd\Execution\Command\SleepUntil;
+use Ruudk\Absurd\Execution\StepHandle;
 
 /**
  * Context passed to task handlers with helper methods for workflow control.
@@ -78,6 +81,21 @@ final class Context
     public function step(string $name, mixed $value): mixed
     {
         return Fiber::suspend(new Checkpoint($name, $value));
+    }
+
+    public function beginStep(string $name): StepHandle
+    {
+        /** @var StepHandle */
+        return Fiber::suspend(new BeginStep($name));
+    }
+
+    public function completeStep(StepHandle $handle, mixed $result): mixed
+    {
+        if ($handle->done) {
+            return $handle->state();
+        }
+
+        return Fiber::suspend(new CompleteStep($handle, $result));
     }
 
     /**

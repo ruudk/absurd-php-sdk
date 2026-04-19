@@ -57,13 +57,16 @@ final readonly class FiberExecutor
                 continue;
             }
 
-            // Handle checkpoint results to track replay state
             if ($result instanceof StepResult) {
                 if (!$result->wasReplayed) {
                     $ctx->markNotReplaying();
                 }
                 /** @var mixed $result Extract the actual value from the step result */
                 $result = $result->value;
+            }
+
+            if ($result instanceof StepHandle && !$result->done) {
+                $ctx->markNotReplaying();
             }
 
             /** @var Command|null $command */

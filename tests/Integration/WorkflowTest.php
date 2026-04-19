@@ -143,6 +143,92 @@ final class WorkflowTest extends IntegrationTestCase
     }
 
     #[Test]
+    public function splitStepCompletes(): void
+    {
+        $workExecutions = 0;
+
+        $this->absurd->registerTask('split-step-workflow', static function (array $params, TaskContext $ctx) use (
+            &$workExecutions,
+        ) {
+            $handle = $ctx->beginStep('do-work');
+            $value = null;
+            if (!$handle->done) {
+                $workExecutions++;
+                $value = $params['input'] * 3;
+            }
+            $result = $ctx->completeStep($handle, $value);
+
+            return ['result' => $result];
+        });
+
+        $spawnResult = $this->absurd->spawn('split-step-workflow', ['input' => 7]);
+        $this->processAllTasks();
+
+        static::assertSame(1, $workExecutions);
+
+        $taskInfo = $this->absurd->getTask($spawnResult->taskId);
+        static::assertSame('completed', $taskInfo->state);
+        static::assertSame(21, $taskInfo->completedPayload['result']);
+    }
+
+    #[Test]
+    public function splitStepRepeatedNamesAutoNumber(): void
+    {
+        $this->absurd->registerTask('split-step-loop', static function (array $params, TaskContext $ctx) {
+            $results = [];
+            for ($i = 0; $i < 3; $i++) {
+                $handle = $ctx->beginStep('loop-step');
+                $value = $handle->done ? $handle->state() : $ctx->completeStep($handle, $i * 10);
+                $results[] = $value;
+            }
+            return ['results' => $results];
+        });
+
+        $spawnResult = $this->absurd->spawn('split-step-loop', []);
+        $this->processAllTasks();
+
+        $taskInfo = $this->absurd->getTask($spawnResult->taskId);
+        static::assertSame('completed', $taskInfo->state);
+        static::assertSame([0, 10, 20], $taskInfo->completedPayload['results']);
+    }
+
+    #[Test]
+    public function splitStepCheckpointsPersistAcrossRuns(): void
+    {
+        $runCount = 0;
+        $workExecutions = 0;
+
+        $this->absurd->registerTask('split-step-checkpoint', static function (array $params, TaskContext $ctx) use (
+            &$runCount,
+            &$workExecutions,
+        ) {
+            $runCount++;
+
+            $handle = $ctx->beginStep('do-work');
+            $value = null;
+            if (!$handle->done) {
+                $workExecutions++;
+                $value = 'computed';
+            }
+            $result = $ctx->completeStep($handle, $value);
+
+            if ($runCount === 1) {
+                throw new \RuntimeException('Simulated failure after step');
+            }
+
+            return ['result' => $result];
+        });
+
+        $this->absurd->spawn('split-step-checkpoint', []);
+
+        $this->processAllTasks();
+        $this->processAllTasks();
+
+        static::assertSame(2, $runCount);
+        static::assertSame(1, $workExecutions, 'Work should only execute once due to checkpointing');
+    }
+
+    #[Test]
     public function multipleAwaitEventsWork(): void
     {
         $this->absurd->registerTask('subtask', static function (array $params, TaskContext $ctx) {

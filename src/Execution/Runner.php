@@ -45,6 +45,28 @@ final readonly class Runner
     }
 
     /**
+     * Begin a named step, returning a handle with the cached state if already checkpointed.
+     */
+    public function executeBeginStep(string $name): StepHandle
+    {
+        $checkpoint = $this->checkpoints->checkAndAdvance($name);
+
+        if ($checkpoint->exists) {
+            return StepHandle::completed($name, $checkpoint->name, $checkpoint->value);
+        }
+
+        return StepHandle::pending($name, $checkpoint->name);
+    }
+
+    /**
+     * Persist the result of a split step using the handle's resolved checkpoint name.
+     */
+    public function executeCompleteStep(string $checkpointName, mixed $result): void
+    {
+        $this->checkpoints->persist($checkpointName, $result);
+    }
+
+    /**
      * Execute a named step with checkpointing.
      */
     public function executeCheckpoint(string $name, mixed $value): StepResult
